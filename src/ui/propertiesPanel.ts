@@ -1,0 +1,465 @@
+import { t } from '../i18n';
+import type { MessageKey } from '../i18n';
+import type { Diagnostic } from '../model/diagnostics';
+import { applyNodeMoves, MIN_DISTRIBUTE_COUNT, planAlign, planDistribute } from '../model/align';
+import type { AlignMode, DistributeAxis } from '../model/align';
+import { nodesInFrame, updateFrame } from '../model/frames';
+import { clearPortPlacements, lostEdgeIds, lostEdgeIdsForCount, setPageSize, setPortGroups, updateNode } from '../model/actions';
+import type { Action, ActionResult } from '../model/actions';
+import { uniqueId } from '../model/ids';
+import { PAGE_SIZE_PRESETS, presetIndexOf } from '../model/pageSize';
+import { getNodePorts, getPage, getTemplate } from '../model/query';
+import { resolvePortGroups } from '../model/ports';
+import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../model/signalActions';
+import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
+import { el, field, select } from './dom';
+
+export interface PanelContext {
+  getDoc(): DiagramDocument;
+  pageId: string;
+  /** 操作を適用する。失敗時の表示は呼び出し側が行い、結果だけ返す */
+  apply(action: Action): ActionResult;
+  confirm(message: string): boolean;
+  /** 現在の確認事項(図から計算したもの) */
+  getDiagnostics(): Diagnostic[];
+  /** 確認事項の項目から、該当の接続を選択する */
+  selectEdge(edgeId: string): void;
+  /** 操作の結果を状態表示へ出す */
+  setStatus(kind: 'info' | 'ok' | 'warn' | 'error', text: string): void;
+}
+
+/** 揃えのボタン(表示順)。表示名は i18n の align.<mode> */
+const ALIGN_MODES: AlignMode[] = ['left', 'hcenter', 'right', 'top', 'vcenter', 'bottom'];
+const DISTRIBUTE_AXES: DistributeAxis[] = ['horizontal', 'vertical'];
+
+/** 追加する信号の色の候補(標準の色と見分けやすい順)。ユーザーは色ピッカーで自由に変えられる */
+const NEW_SIGNAL_COLORS = ['#e8590c', '#0c8599', '#5f3dc4', '#862e9c', '#2b8a3e', '#364fc7'];
+
+const SIDES: Side[] = ['left', 'right', 'top', 'bottom'];
+const DIRECTIONS: Direction[] = ['in', 'out', 'inout'];
+
+/**
+ * 選択中の機器の名称・型番・台数と、ポート構成を編集する。
+ * ポート構成は「この機器だけ」の上書きとして保存する(同じ種類の他の機器は変わらない)。
+ * 値は入力欄を離れたとき(change)に確定し、キー入力のたびには適用しない。
+ */
+export class PropertiesPanel {
+  constructor(
+    private readonly root: HTMLElement,
+    private readonly ctx: PanelContext,
+  ) {
+    // Tab で次の欄へ移るとき、change は focusout より先に、しかも activeElement が body になった状態で
+    // 起きる(実ブラウザの記録で確認)。そのため「いまフォーカスがあるか」では判定できない。
+    // パネル内で change が起きたこと自体を覚えておき、その処理の間の描き直しを遅らせる。
+    root.addEventListener(
+      'change',
+      () => {
+        this.committing = true;
+        setTimeout(() => (this.committing = false), 0);
+      },
+      true,
+    );
+  }
+
+  private pendingRender: (() => void) | undefined;
+  /** パネル内で値の確定(change)が起きた直後の、同じ処理の間か */
+  private committing = false;
+
+  /** パネルの識別子を、フォーカス復元用の文字列にする(機器・信号の行、項目名、ボタン名の組) */
+  private focusKey(target: Element | null): string | undefined {
+    if (!(target instanceof HTMLElement) || !this.root.contains(target)) return undefined;
+    const part = (attr: string): string => target.closest(`[${attr}]`)?.getAttribute(attr) ?? '';
+    const key = [part('data-group'), part('data-signal'), target.dataset.prop ?? '', target.dataset.action ?? ''].join('|');
+    return key === '|||' ? undefined : key;
+  }
+
+  /**
+   * パネルを描き直す。入力欄にフォーカスがあるときは、描き直しを一呼吸遅らせる:
+   * 値の確定(change)は、Tab で次の欄へ移る途中に起きる。その場で作り直すと、移動先の欄ごと消えて
+   * フォーカスを失う。遅らせて、移動が終わったあとの欄を覚え、作り直した同じ欄へフォーカスを戻す。
+   */
+  private refresh(render: () => void): void {
+    if (this.focusKey(document.activeElement) === undefined && !this.committing) {
+      render(); // フォーカスが無く、値の確定の途中でもないときは、すぐ描き直す
+      return;
+    }
+    const first = this.pendingRender === undefined;
+    this.pendingRender = render; // 続けて来た要求は、最後の1回にまとめる
+    if (!first) return;
+    setTimeout(() => {
+      const run = this.pendingRender;
+      this.pendingRender = undefined;
+      if (!run) return;
+      const key = this.focusKey(document.activeElement);
+      run();
+      if (key === undefined) return;
+      for (const candidate of this.root.querySelectorAll<HTMLElement>('[data-prop], [data-action]')) {
+        if (this.focusKey(candidate) === key) {
+          candidate.focus();
+          return;
+        }
+      }
+    }, 0);
+  }
+
+  update(nodeId: string | null): void {
+    this.refresh(() => this.renderNode(nodeId));
+  }
+
+  /**
+   * 2件以上を選んでいるとき: 編集欄は出さず、件数と削除の案内を出す(確認事項などは残す)。
+   * 機器を2台以上選んでいれば、揃え・等間隔のボタンも出す(枠や線は対象外)。
+   */
+  updateMulti(count: number, nodeIds: readonly string[] = []): void {
+    this.refresh(() => this.renderNode(null, t('props.multi', { count }), nodeIds));
+  }
+
+  private renderNode(nodeId: string | null, emptyHint: string = t('props.empty'), alignIds: readonly string[] = []): void {
+    this.root.replaceChildren(el('h2', { text: t('props.title') }));
+    const doc = this.ctx.getDoc();
+    const node = nodeId ? getPage(doc, this.ctx.pageId)?.nodes.find((n) => n.id === nodeId) : undefined;
+    if (!node) {
+      this.root.append(el('p', { className: 'hint', text: emptyHint }));
+      if (alignIds.length >= 2) this.root.append(this.alignSection(alignIds));
+      this.root.append(this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
+      return;
+    }
+    this.root.append(this.basicFields(node), this.portSection(doc, node));
+  }
+
+  /** 選んだ機器の揃え・等間隔。動く機器がなければ何も適用せず(履歴を積まず)、その旨を知らせる */
+  private alignSection(ids: readonly string[]): HTMLElement {
+    const run = (moves: ReturnType<typeof planAlign>): void => {
+      if (moves.length === 0) {
+        this.ctx.setStatus('info', t('status.alignNothing'));
+        return;
+      }
+      if (this.ctx.apply(applyNodeMoves(this.ctx.pageId, moves)).ok) this.ctx.setStatus('ok', t('status.aligned', { count: moves.length }));
+    };
+    const button = (text: string, action: string, disabled: boolean, onClick: () => void) =>
+      el('button', {
+        text,
+        attrs: { type: 'button', 'data-action': action, ...(disabled ? { disabled: '', title: t('align.needThree') } : {}) },
+        on: { click: onClick },
+      });
+    const doc = () => this.ctx.getDoc();
+    const canDistribute = ids.length >= MIN_DISTRIBUTE_COUNT;
+    return el('div', { className: 'section', attrs: { 'data-section': 'align' } }, [
+      el('h3', { text: t('align.title') }),
+      el(
+        'div',
+        { className: 'button-row' },
+        ALIGN_MODES.map((mode) => button(t(('align.' + mode) as MessageKey), 'align-' + mode, false, () => run(planAlign(doc(), this.ctx.pageId, ids, mode)))),
+      ),
+      el(
+        'div',
+        { className: 'button-row' },
+        DISTRIBUTE_AXES.map((axis) =>
+          button(t(('align.distribute.' + axis) as MessageKey), 'distribute-' + axis, !canDistribute, () => run(planDistribute(doc(), this.ctx.pageId, ids, axis))),
+        ),
+      ),
+      // 無効の理由は title だけでは、キーボードや読み上げでは分からないので、文でも出す
+      ...(canDistribute ? [] : [el('p', { className: 'hint', text: t('align.needThree') })]),
+    ]);
+  }
+
+  /**
+   * 確認事項の一覧。図から計算した指摘を並べ、項目を押すと該当の線を選択する。
+   * 直した指摘は、次の描き直しで一覧から消える(保存しない、毎回計算する)。
+   */
+  private checksSection(doc: DiagramDocument): HTMLElement {
+    const items = this.ctx.getDiagnostics();
+    const section = el('div', { className: 'section', attrs: { 'data-section': 'checks' } }, [
+      el('h3', { text: t('check.title') + (items.length > 0 ? ` (${items.length})` : '') }),
+    ]);
+    if (items.length === 0) {
+      section.append(el('p', { className: 'hint', text: '✓ ' + t('check.none') }));
+      return section;
+    }
+    section.append(el('p', { className: 'hint', text: t('check.legend') }));
+    const page = getPage(doc, this.ctx.pageId);
+    const where = (ref: { nodeId: string; portId: string }) => {
+      const node = page?.nodes.find((n) => n.id === ref.nodeId);
+      const port = node ? getNodePorts(doc, node).find((p) => p.id === ref.portId) : undefined;
+      return `${node?.label ?? ref.nodeId} ${port?.label ?? ref.portId}`;
+    };
+    const signalLabel = (ref: { nodeId: string; portId: string }) => {
+      const node = page?.nodes.find((n) => n.id === ref.nodeId);
+      const sig = node ? getNodePorts(doc, node).find((p) => p.id === ref.portId)?.signalType : undefined;
+      return doc.signalTypes.find((s) => s.id === sig)?.label ?? sig ?? '?';
+    };
+    for (const d of items) {
+      const message =
+        d.code === 'signal-mismatch'
+          ? t('check.signalMismatch', { a: signalLabel(d.from), b: signalLabel(d.to) })
+          : d.code === 'direction-mismatch'
+            ? t('check.directionMismatch')
+            : t('check.broken');
+      const icon = d.severity === 'error' ? '✕' : '⚠';
+      section.append(
+        el('button', {
+          className: `check-item ${d.severity}`,
+          attrs: { type: 'button', 'data-check': d.key },
+          on: { click: () => this.ctx.selectEdge(d.edgeId) },
+        }, [
+          el('span', { className: 'check-head', text: `${icon} ${where(d.from)} ↔ ${where(d.to)}` }),
+          el('span', { className: 'check-msg', text: message }),
+        ]),
+      );
+    }
+    return section;
+  }
+
+  /** 凡例(信号の種類)の編集。何も選んでいないときに出す。名称・色・並び・追加・削除 */
+  /** 「自由に指定」を選んだ状態(表示だけの状態で、保存しない)。標準以外の大きさのときは常に入力欄を出す */
+  private customSize = false;
+
+  /**
+   * ページ(キャンバス)の大きさ。標準は 16:9 の3段階、「自由に指定」で幅・高さを数値で入力する。
+   * 小さくして機器・枠がはみ出す場合は、操作が断られ(理由は右上に表示)、欄は元の値へ戻る。
+   */
+  private pageSizeSection(doc: DiagramDocument): HTMLElement {
+    const page = getPage(doc, this.ctx.pageId);
+    const section = el('div', { className: 'section' }, [el('h3', { text: t('page.title') })]);
+    if (!page) return section;
+    const size = page.size;
+    const preset = presetIndexOf(size);
+    const showInputs = this.customSize || preset === -1;
+    const options = [...PAGE_SIZE_PRESETS.map((p, i) => ({ value: String(i), label: `${p.w} × ${p.h}` })), { value: 'custom', label: t('page.custom') }];
+    const sel = select(options, showInputs ? 'custom' : String(preset));
+    sel.setAttribute('data-prop', 'page-preset');
+    sel.addEventListener('change', () => {
+      if (sel.value === 'custom') {
+        this.customSize = true;
+        this.update(null);
+        return;
+      }
+      this.customSize = false;
+      const p = PAGE_SIZE_PRESETS[Number(sel.value)];
+      if (!this.ctx.apply(setPageSize(this.ctx.pageId, p)).ok) this.update(null); // 断られたら、選択を元へ戻す
+    });
+    section.append(field(t('page.size'), sel));
+    if (showInputs) {
+      const num = (prop: 'w' | 'h', label: string) => {
+        const input = el('input', {
+          attrs: { type: 'number', step: String(doc.grid.size), value: String(size[prop]), 'data-prop': `page-${prop}` },
+          on: {
+            change: (ev) => {
+              const v = Number((ev.target as HTMLInputElement).value);
+              if (!this.ctx.apply(setPageSize(this.ctx.pageId, { ...size, [prop]: v })).ok) this.update(null); // 不正・断られた値は元へ戻す
+            },
+          },
+        });
+        return field(label, input);
+      };
+      section.append(num('w', t('page.width')), num('h', t('page.height')));
+    }
+    section.append(el('p', { className: 'hint', text: t('page.hint') }));
+    return section;
+  }
+
+  private legendSection(doc: DiagramDocument): HTMLElement {
+    const section = el('div', { className: 'section' }, [el('h3', { text: t('legend.edit') })]);
+    const last = doc.signalTypes.length - 1;
+    doc.signalTypes.forEach((s, i) => {
+      const used = signalUsage(doc, s.id);
+      const color = el('input', {
+        className: 'color-input',
+        attrs: { type: 'color', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color' },
+        on: { change: (ev) => this.ctx.apply(updateSignalType(s.id, { color: (ev.target as HTMLInputElement).value })) },
+      });
+      const label = el('input', {
+        attrs: { type: 'text', value: s.label, 'data-prop': 'signal-label' },
+        on: {
+          change: (ev) => {
+            const r = this.ctx.apply(updateSignalType(s.id, { label: (ev.target as HTMLInputElement).value }));
+            if (!r.ok) this.update(null); // 空の名称などは拒否し、入力欄を元の値へ戻す
+          },
+        },
+      });
+      const button = (text: string, aria: string, action: string, disabled: boolean, onClick: () => void) =>
+        el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click: onClick } });
+      const row = el('div', { className: 'signal-row', attrs: { 'data-signal': s.id } }, [
+        color,
+        label,
+        button(t('legend.up'), t('legend.upLabel'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1))),
+        button(t('legend.down'), t('legend.downLabel'), 'signal-down', i === last, () => this.ctx.apply(moveSignalType(s.id, 1))),
+        button(t('legend.remove'), t('legend.remove'), 'signal-remove', false, () => this.ctx.apply(removeSignalType(s.id))),
+      ]);
+      if (used > 0) row.title = t('legend.usage', { count: used });
+      section.append(row);
+    });
+    section.append(
+      el('button', {
+        text: t('legend.add'),
+        attrs: { type: 'button', 'data-action': 'signal-add' },
+        on: { click: () => this.ctx.apply(addSignalType(t('legend.newLabel'), NEW_SIGNAL_COLORS[doc.signalTypes.length % NEW_SIGNAL_COLORS.length])) },
+      }),
+    );
+    return section;
+  }
+
+  /** 選択した枠の編集。名称と、中にある機器の数。枠の位置・大きさは、図の上で直接変える */
+  updateFrame(frameId: string): void {
+    this.refresh(() => this.renderFrame(frameId));
+  }
+
+  private renderFrame(frameId: string): void {
+    this.root.replaceChildren(el('h2', { text: t('frame.title') }));
+    const doc = this.ctx.getDoc();
+    const page = getPage(doc, this.ctx.pageId);
+    const frame = page?.groups.find((g) => g.id === frameId);
+    if (!page || !frame) {
+      this.renderNode(null);
+      return;
+    }
+    const name = el('input', {
+      attrs: { type: 'text', value: frame.label, 'data-prop': 'frame-label' },
+      on: { change: (ev) => this.ctx.apply(updateFrame(this.ctx.pageId, frameId, { label: (ev.target as HTMLInputElement).value })) },
+    });
+    this.root.append(
+      el('div', { className: 'section' }, [
+        field(t('props.name'), name),
+        el('p', { className: 'hint', text: t('frame.contains', { count: nodesInFrame(page, frame).length }) }),
+        el('p', { className: 'hint', text: t('frame.hint') }),
+      ]),
+    );
+  }
+
+  private basicFields(node: DiagramNode): HTMLElement {
+    const text = (value: string, onChange: (v: string) => void, attrs: Record<string, string> = {}) =>
+      el('input', { attrs: { type: 'text', value, ...attrs }, on: { change: (ev) => onChange((ev.target as HTMLInputElement).value) } });
+
+    const name = text(node.label, (v) => this.ctx.apply(updateNode(this.ctx.pageId, node.id, { label: v })));
+    name.setAttribute('data-prop', 'label');
+    const model = text(node.model, (v) => this.ctx.apply(updateNode(this.ctx.pageId, node.id, { model: v })));
+    model.setAttribute('data-prop', 'model');
+    const count = el('input', {
+      attrs: { type: 'number', min: '1', step: '1', value: node.count ? String(node.count) : '', 'data-prop': 'count' },
+      on: {
+        change: (ev) => {
+          const raw = (ev.target as HTMLInputElement).value.trim();
+          const next = raw === '' ? undefined : Number(raw);
+          // 台数を減らすと、なくなる台のポートの接続も消える。確認を取ってから適用する
+          const lost = next === undefined || (Number.isInteger(next) && next >= 1) ? lostEdgeIdsForCount(this.ctx.getDoc(), this.ctx.pageId, node.id, next ?? 1) : [];
+          if (lost.length > 0 && !this.ctx.confirm(t('confirm.removePorts', { count: lost.length }))) {
+            this.update(node.id);
+            return;
+          }
+          const r = this.ctx.apply(updateNode(this.ctx.pageId, node.id, { count: next }, { removeOrphanEdges: lost.length > 0 }));
+          if (!r.ok) this.update(node.id); // 不正な値は、入力欄を元の値へ戻す
+        },
+      },
+    });
+    return el('div', { className: 'section' }, [
+      field(t('props.name'), name),
+      field(t('props.model'), model),
+      field(t('props.count'), count),
+      ...(node.count && node.count > 1 ? [el('p', { className: 'hint', text: t('props.unitPortsHint') })] : []),
+    ]);
+  }
+
+  private portSection(doc: DiagramDocument, node: DiagramNode): HTMLElement {
+    const tpl = getTemplate(doc, node.templateId);
+    const groups: PortGroup[] = tpl ? structuredClone(resolvePortGroups(tpl, node)) : [];
+    const section = el('div', { className: 'section' }, [el('h3', { text: t('props.ports') })]);
+
+    const commit = (next: PortGroup[]) => {
+      const lost = lostEdgeIds(this.ctx.getDoc(), this.ctx.pageId, node.id, next);
+      if (lost.length > 0 && !this.ctx.confirm(t('confirm.removePorts', { count: lost.length }))) {
+        this.update(node.id); // 取り消し: 入力欄を元の値へ戻す
+        return;
+      }
+      const r = this.ctx.apply(setPortGroups(this.ctx.pageId, node.id, next, { removeOrphanEdges: lost.length > 0 }));
+      if (!r.ok) this.update(node.id);
+    };
+
+    groups.forEach((g, i) => {
+      const edit = (patch: Partial<PortGroup>) => commit(groups.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+      const row = el('div', { className: 'group-row', attrs: { 'data-group': g.id } }, [
+        field(t('props.signal'), this.signalSelect(doc, g, (v) => edit({ signalType: v }))),
+        field(t('props.direction'), this.directionSelect(g, (v) => edit({ direction: v }))),
+        field(t('props.side'), this.sideSelect(g, (v) => edit({ side: v }))),
+        field(
+          t('props.portCount'),
+          el('input', {
+            attrs: { type: 'number', min: '0', step: '1', value: String(g.count), 'data-prop': 'port-count' },
+            on: { change: (ev) => edit({ count: Number((ev.target as HTMLInputElement).value) }) },
+          }),
+        ),
+        field(t('props.connections'), this.multiSelect(g, (v) => edit({ multi: v }))),
+        field(
+          t('props.prefix'),
+          el('input', { attrs: { type: 'text', value: g.labelPrefix, 'data-prop': 'port-prefix' }, on: { change: (ev) => edit({ labelPrefix: (ev.target as HTMLInputElement).value }) } }),
+        ),
+        el('button', {
+          className: 'danger',
+          text: t('props.removeGroup'),
+          attrs: { type: 'button', 'data-action': 'remove-group' },
+          on: { click: () => commit(groups.filter((_, j) => j !== i)) },
+        }),
+      ]);
+      section.append(row);
+    });
+
+    section.append(el('p', { className: 'hint', text: t('props.portMoveHint') }));
+    if (node.portPlacements) {
+      section.append(
+        el('button', {
+          text: t('props.resetPorts'),
+          attrs: { type: 'button', 'data-action': 'reset-ports' },
+          on: { click: () => this.ctx.apply(clearPortPlacements(this.ctx.pageId, node.id)) },
+        }),
+      );
+    }
+    section.append(
+      el('button', {
+        text: t('props.addGroup'),
+        attrs: { type: 'button', 'data-action': 'add-group' },
+        on: {
+          click: () => {
+            const signal = doc.signalTypes[0];
+            if (!signal) return;
+            const id = uniqueId(signal.id.toLowerCase(), groups.map((x) => x.id));
+            commit([...groups, { id, signalType: signal.id, direction: 'inout', side: 'left', count: 1, labelPrefix: `${signal.label} ` }]);
+          },
+        },
+      }),
+    );
+    return section;
+  }
+
+  private signalSelect(doc: DiagramDocument, g: PortGroup, on: (v: string) => void): HTMLSelectElement {
+    const s = select(doc.signalTypes.map((x) => ({ value: x.id, label: x.label })), g.signalType);
+    s.setAttribute('data-prop', 'port-signal');
+    s.addEventListener('change', () => on(s.value));
+    return s;
+  }
+
+  private directionSelect(g: PortGroup, on: (v: Direction) => void): HTMLSelectElement {
+    const s = select(DIRECTIONS.map((d) => ({ value: d, label: t(`direction.${d}` as MessageKey) })), g.direction);
+    s.setAttribute('data-prop', 'port-direction');
+    s.addEventListener('change', () => on(s.value as Direction));
+    return s;
+  }
+
+  private multiSelect(g: PortGroup, on: (v: boolean) => void): HTMLSelectElement {
+    const s = select(
+      [
+        { value: 'single', label: t('props.connSingle') },
+        { value: 'multi', label: t('props.connMulti') },
+      ],
+      g.multi ? 'multi' : 'single',
+    );
+    s.setAttribute('data-prop', 'port-multi');
+    s.addEventListener('change', () => on(s.value === 'multi'));
+    return s;
+  }
+
+  private sideSelect(g: PortGroup, on: (v: Side) => void): HTMLSelectElement {
+    const s = select(SIDES.map((x) => ({ value: x, label: t(`side.${x}` as MessageKey) })), g.side);
+    s.setAttribute('data-prop', 'port-side');
+    s.addEventListener('change', () => on(s.value as Side));
+    return s;
+  }
+}

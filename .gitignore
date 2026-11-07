@@ -1,0 +1,7 @@
+# ビルド成果物と標準の依存物のみ
+bin/
+obj/
+dist/
+dist-e2e/
+venv/
+node_modules/

@@ -1,0 +1,747 @@
+{
+  "format": "system-diagram",
+  "version": 1,
+  "language": "ja",
+  "grid": {
+    "size": 10,
+    "enabled": true
+  },
+  "signalTypes": [
+    {
+      "id": "LAN",
+      "label": "LAN",
+      "color": "#1a9850"
+    },
+    {
+      "id": "CONTROL",
+      "label": "CONTROL",
+      "color": "#f0b400"
+    },
+    {
+      "id": "HDMI",
+      "label": "HDMI",
+      "color": "#6f8fd0"
+    },
+    {
+      "id": "USB",
+      "label": "USB",
+      "color": "#7b4fa0"
+    },
+    {
+      "id": "AUDIO",
+      "label": "AUDIO",
+      "color": "#ff6fa8"
+    }
+  ],
+  "deviceTemplates": [
+    {
+      "id": "panel-usb",
+      "name": "Panel (USB)",
+      "kind": "panel",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "usb",
+          "signalType": "USB",
+          "direction": "out",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "USB "
+        }
+      ]
+    },
+    {
+      "id": "panel-lan",
+      "name": "Panel (LAN)",
+      "kind": "panel",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "pc-usb",
+      "name": "PC (USB)",
+      "kind": "pc",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "usb",
+          "signalType": "USB",
+          "direction": "out",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "USB "
+        }
+      ]
+    },
+    {
+      "id": "encoder",
+      "name": "Encoder",
+      "kind": "generic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "usb",
+          "signalType": "USB",
+          "direction": "in",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "USB "
+        },
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "decoder",
+      "name": "Decoder",
+      "kind": "generic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "hdmi",
+          "signalType": "HDMI",
+          "direction": "out",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "HDMI "
+        },
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "bottom",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "minipc",
+      "name": "Mini PC",
+      "kind": "pc",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "usb",
+          "signalType": "USB",
+          "direction": "in",
+          "side": "top",
+          "count": 1,
+          "labelPrefix": "USB "
+        },
+        {
+          "id": "hdmi-in",
+          "signalType": "HDMI",
+          "direction": "in",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "HDMI IN "
+        },
+        {
+          "id": "hdmi-out",
+          "signalType": "HDMI",
+          "direction": "out",
+          "side": "right",
+          "count": 2,
+          "labelPrefix": "HDMI OUT "
+        },
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "bottom",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "display",
+      "name": "Display",
+      "kind": "display",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "hdmi",
+          "signalType": "HDMI",
+          "direction": "in",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "HDMI "
+        }
+      ]
+    },
+    {
+      "id": "switch",
+      "name": "Network Switch",
+      "kind": "switch",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan-l",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "left",
+          "count": 8,
+          "labelPrefix": "L"
+        },
+        {
+          "id": "lan-r",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "right",
+          "count": 8,
+          "labelPrefix": "R"
+        },
+        {
+          "id": "lan-t",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "top",
+          "count": 2,
+          "labelPrefix": "T"
+        },
+        {
+          "id": "lan-b",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "bottom",
+          "count": 4,
+          "labelPrefix": "B"
+        }
+      ]
+    },
+    {
+      "id": "controller",
+      "name": "Controller",
+      "kind": "generic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "top",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "amp",
+      "name": "Amplifier",
+      "kind": "amp",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "top",
+          "count": 1,
+          "labelPrefix": "LAN "
+        },
+        {
+          "id": "audio",
+          "signalType": "AUDIO",
+          "direction": "out",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "OUT "
+        }
+      ]
+    },
+    {
+      "id": "speaker",
+      "name": "Speaker",
+      "kind": "speaker",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "audio",
+          "signalType": "AUDIO",
+          "direction": "in",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "IN "
+        }
+      ]
+    },
+    {
+      "id": "lan-left",
+      "name": "LAN device",
+      "kind": "generic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "camera",
+      "name": "PTZ Camera",
+      "kind": "camera",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "mic",
+      "name": "Ceiling Mic",
+      "kind": "mic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "right",
+          "count": 1,
+          "labelPrefix": "LAN "
+        }
+      ]
+    },
+    {
+      "id": "free-ports",
+      "name": "Access Point",
+      "kind": "generic",
+      "shape": "roundRect",
+      "portGroups": [
+        {
+          "id": "lan",
+          "signalType": "LAN",
+          "direction": "inout",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "LAN "
+        },
+        {
+          "id": "audio",
+          "signalType": "AUDIO",
+          "direction": "in",
+          "side": "left",
+          "count": 1,
+          "labelPrefix": "AUDIO "
+        }
+      ]
+    }
+  ],
+  "assets": {},
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Page 1",
+      "size": {
+        "w": 1280,
+        "h": 720
+      },
+      "nodes": [
+        {
+          "id": "tap",
+          "templateId": "panel-usb",
+          "label": "USB Panel",
+          "model": "",
+          "x": 40,
+          "y": 70,
+          "w": 120,
+          "h": 50
+        },
+        {
+          "id": "mute",
+          "templateId": "panel-lan",
+          "label": "Mute Button",
+          "model": "Model-A2",
+          "x": 40,
+          "y": 140,
+          "w": 120,
+          "h": 100,
+          "count": 4
+        },
+        {
+          "id": "tsc",
+          "templateId": "panel-lan",
+          "label": "Control Touch Panel",
+          "model": "Model-A3",
+          "x": 40,
+          "y": 260,
+          "w": 120,
+          "h": 60
+        },
+        {
+          "id": "lap",
+          "templateId": "pc-usb",
+          "label": "Laptop PC",
+          "model": "",
+          "x": 40,
+          "y": 350,
+          "w": 120,
+          "h": 50
+        },
+        {
+          "id": "enc",
+          "templateId": "encoder",
+          "label": "Encoder",
+          "model": "Model-B1",
+          "x": 210,
+          "y": 350,
+          "w": 110,
+          "h": 50
+        },
+        {
+          "id": "dec",
+          "templateId": "decoder",
+          "label": "Decoder",
+          "model": "Model-B2",
+          "x": 500,
+          "y": 130,
+          "w": 120,
+          "h": 60
+        },
+        {
+          "id": "mini",
+          "templateId": "minipc",
+          "label": "Mini PC",
+          "model": "Model-C1",
+          "x": 700,
+          "y": 130,
+          "w": 130,
+          "h": 60
+        },
+        {
+          "id": "d1",
+          "templateId": "display",
+          "label": "98\" Display",
+          "model": "Model-D1",
+          "x": 980,
+          "y": 100,
+          "w": 140,
+          "h": 70
+        },
+        {
+          "id": "d2",
+          "templateId": "display",
+          "label": "98\" Display",
+          "model": "Model-D1",
+          "x": 980,
+          "y": 190,
+          "w": 140,
+          "h": 70
+        },
+        {
+          "id": "sw",
+          "templateId": "switch",
+          "label": "Network Switch",
+          "model": "Model-E1",
+          "x": 560,
+          "y": 380,
+          "w": 260,
+          "h": 130
+        },
+        {
+          "id": "ctl",
+          "templateId": "controller",
+          "label": "Controller",
+          "model": "Model-F1",
+          "x": 730,
+          "y": 540,
+          "w": 140,
+          "h": 50
+        },
+        {
+          "id": "amp",
+          "templateId": "amp",
+          "label": "Amplifier",
+          "model": "Model-G1",
+          "x": 560,
+          "y": 580,
+          "w": 140,
+          "h": 50
+        },
+        {
+          "id": "spk",
+          "templateId": "speaker",
+          "label": "Ceiling Speaker",
+          "model": "Model-H1",
+          "x": 1000,
+          "y": 490,
+          "w": 140,
+          "h": 140,
+          "count": 6
+        },
+        {
+          "id": "ptz",
+          "templateId": "camera",
+          "label": "PTZ Camera",
+          "model": "Model-J1",
+          "x": 1000,
+          "y": 360,
+          "w": 140,
+          "h": 50
+        },
+        {
+          "id": "aif",
+          "templateId": "lan-left",
+          "label": "Audio IF",
+          "model": "Model-K1",
+          "x": 1000,
+          "y": 420,
+          "w": 140,
+          "h": 50
+        },
+        {
+          "id": "mic",
+          "templateId": "mic",
+          "label": "Ceiling Mic",
+          "model": "Model-L1",
+          "x": 60,
+          "y": 520,
+          "w": 140,
+          "h": 50
+        },
+        {
+          "id": "ap",
+          "templateId": "free-ports",
+          "label": "Access Point",
+          "model": "Model-M1",
+          "x": 1000,
+          "y": 650,
+          "w": 140,
+          "h": 60
+        }
+      ],
+      "edges": [
+        {
+          "id": "e-1",
+          "from": {
+            "nodeId": "tap",
+            "portId": "usb-1"
+          },
+          "to": {
+            "nodeId": "mini",
+            "portId": "usb-1"
+          }
+        },
+        {
+          "id": "e-2",
+          "from": {
+            "nodeId": "dec",
+            "portId": "hdmi-1"
+          },
+          "to": {
+            "nodeId": "mini",
+            "portId": "hdmi-in-1"
+          }
+        },
+        {
+          "id": "e-3",
+          "from": {
+            "nodeId": "mini",
+            "portId": "hdmi-out-1"
+          },
+          "to": {
+            "nodeId": "d1",
+            "portId": "hdmi-1"
+          }
+        },
+        {
+          "id": "e-4",
+          "from": {
+            "nodeId": "mini",
+            "portId": "hdmi-out-2"
+          },
+          "to": {
+            "nodeId": "d2",
+            "portId": "hdmi-1"
+          }
+        },
+        {
+          "id": "e-5",
+          "from": {
+            "nodeId": "mute",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-l-1"
+          }
+        },
+        {
+          "id": "e-6",
+          "from": {
+            "nodeId": "tsc",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-l-2"
+          }
+        },
+        {
+          "id": "e-7",
+          "from": {
+            "nodeId": "enc",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-l-3"
+          }
+        },
+        {
+          "id": "e-8",
+          "from": {
+            "nodeId": "mic",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-l-4"
+          }
+        },
+        {
+          "id": "e-9",
+          "from": {
+            "nodeId": "lap",
+            "portId": "usb-1"
+          },
+          "to": {
+            "nodeId": "enc",
+            "portId": "usb-1"
+          }
+        },
+        {
+          "id": "e-10",
+          "from": {
+            "nodeId": "dec",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-t-1"
+          }
+        },
+        {
+          "id": "e-11",
+          "from": {
+            "nodeId": "mini",
+            "portId": "lan-1"
+          },
+          "to": {
+            "nodeId": "sw",
+            "portId": "lan-t-2"
+          }
+        },
+        {
+          "id": "e-12",
+          "from": {
+            "nodeId": "sw",
+            "portId": "lan-r-1"
+          },
+          "to": {
+            "nodeId": "ptz",
+            "portId": "lan-1"
+          }
+        },
+        {
+          "id": "e-13",
+          "from": {
+            "nodeId": "sw",
+            "portId": "lan-r-2"
+          },
+          "to": {
+            "nodeId": "aif",
+            "portId": "lan-1"
+          }
+        },
+        {
+          "id": "e-14",
+          "from": {
+            "nodeId": "sw",
+            "portId": "lan-b-1"
+          },
+          "to": {
+            "nodeId": "ctl",
+            "portId": "lan-1"
+          }
+        },
+        {
+          "id": "e-15",
+          "from": {
+            "nodeId": "sw",
+            "portId": "lan-b-2"
+          },
+          "to": {
+            "nodeId": "amp",
+            "portId": "lan-1"
+          }
+        },
+        {
+          "id": "e-16",
+          "from": {
+            "nodeId": "amp",
+            "portId": "audio-1"
+          },
+          "to": {
+            "nodeId": "spk",
+            "portId": "audio-1"
+          }
+        }
+      ],
+      "groups": [
+        {
+          "id": "g-table",
+          "label": "Table",
+          "x": 20,
+          "y": 40,
+          "w": 320,
+          "h": 390
+        },
+        {
+          "id": "g-behind",
+          "label": "Behind Display",
+          "x": 470,
+          "y": 70,
+          "w": 400,
+          "h": 210
+        },
+        {
+          "id": "g-rack",
+          "label": "Rack",
+          "x": 500,
+          "y": 300,
+          "w": 420,
+          "h": 380
+        }
+      ]
+    }
+  ]
+}

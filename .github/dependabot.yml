@@ -1,0 +1,8 @@
+# 依存パッケージの更新を、週1回、プルリクエストで知らせる(自動でマージはしない)。
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
