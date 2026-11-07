@@ -379,9 +379,14 @@ function validGroups(doc: DiagramDocument, groups: readonly PortGroup[]): boolea
 }
 
 /** ポート構成に合わせて機器を大きくする(小さくはしない。利用者が決めた大きさを尊重する) */
-function growToFit(node: DiagramNode, doc: DiagramDocument): void {
+/** ポート・名称・型番が収まる、機器の最小の大きさ(グリッドの倍数) */
+export function minNodeSize(node: DiagramNode, doc: DiagramDocument): { w: number; h: number } {
   const groups = node.portGroupsOverride ?? getTemplate(doc, node.templateId)?.portGroups ?? [];
-  const need = autoNodeSize({ groups, label: node.label, model: node.model, grid: doc.grid.size, units: node.count });
+  return autoNodeSize({ groups, label: node.label, model: node.model, grid: doc.grid.size, units: node.count });
+}
+
+function growToFit(node: DiagramNode, doc: DiagramDocument): void {
+  const need = minNodeSize(node, doc);
   node.w = Math.max(node.w, need.w);
   node.h = Math.max(node.h, need.h);
 }

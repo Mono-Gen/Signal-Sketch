@@ -1,5 +1,6 @@
 import { exceedsPortLimit, expandPortGroups, expandUnits, MAX_PORTS_PER_NODE, MAX_UNITS, resolvePortGroups } from './ports';
 import { isValidPageSize, MAX_PAGE, MIN_PAGE } from './pageSize';
+import { assetsIssue } from './images';
 import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from './docLimits';
 import { isHexColor } from './signalActions';
 import { CURRENT_VERSION, DOCUMENT_FORMAT } from './types';
@@ -104,6 +105,8 @@ function checkFields(doc: Record<string, unknown>): string[] {
       str(w, 'labelPrefix', g.labelPrefix);
     });
 
+  const assetsProblem = assetsIssue(doc.assets);
+  if (assetsProblem) bad(`assets: ${assetsProblem}`);
   if (doc.language !== undefined) oneOf('language', 'value', doc.language, ['ja', 'en']);
   const grid = doc.grid as Record<string, unknown>;
   if (grid.enabled !== undefined && typeof grid.enabled !== 'boolean') bad('grid.enabled は真偽値である必要があります');
@@ -139,6 +142,8 @@ function checkFields(doc: Record<string, unknown>): string[] {
       num(w, 'count', n.count, true);
       str(w, 'note', n.note, true);
       str(w, 'iconOverride', n.iconOverride, true);
+      str(w, 'imageId', n.imageId, true);
+      if (typeof n.imageId === 'string' && !(isRecord(doc.assets) && typeof doc.assets[n.imageId] === 'string')) bad(`${w}.imageId「${n.imageId.slice(0, 40)}」の画像が assets にありません`);
       if (n.portGroupsOverride !== undefined) groups(`${w}.portGroupsOverride`, n.portGroupsOverride as Record<string, unknown>[]);
       if (isRecord(n.portPlacements)) {
         for (const [portId, placement] of Object.entries(n.portPlacements)) {

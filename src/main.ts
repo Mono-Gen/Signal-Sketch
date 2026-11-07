@@ -57,6 +57,7 @@ const panel = new PropertiesPanel($('props'), {
   confirm: (message) => window.confirm(message),
   getDiagnostics: () => diagnose(store.doc),
   selectEdge: (edgeId) => view.selectEdge(edgeId),
+  getEpoch: () => store.epoch,
   setStatus,
 });
 

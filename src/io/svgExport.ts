@@ -1,3 +1,4 @@
+import { imageBox, isImageDataUri } from '../model/images';
 import { getNodePorts, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
 import { markerSpec } from '../model/portMarker';
@@ -110,11 +111,14 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
   const shape = tpl?.shape ?? 'roundRect';
   const clipId = `clip-${index}`;
   const signals = new Map(doc.signalTypes.map((s) => [s.id, s]));
-  const textX = n.x + th.iconSize + 14;
+  const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
+  const image = isImageDataUri(imageUri) ? imageUri : undefined;
+  const textInset = image ? 14 : th.iconSize + 14; // 画像があるときは、小さなアイコンを出さない
+  const textX = n.x + textInset;
   const countText = n.count ? ` ${opts.countText(n.count)}` : '';
   const modelLine = `${n.model}${countText}`.trim();
   // 画面と同じく、名称・型番は枠の幅で折り返す(画面と同じく、右端の余白はわずか)
-  const avail = n.w - (th.iconSize + 14) - 2;
+  const avail = n.w - textInset - 2;
   const measure = opts.measureText ?? ((text: string) => estimateTextWidth(text));
   const labelLines = wrapText(n.label, avail, (text) => measure(text, true));
   const modelLines = modelLine ? wrapText(modelLine, avail, (text) => measure(text, false)) : [];
@@ -126,7 +130,12 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
   const parts = [
     `<clipPath id="${clipId}"><rect x="${num(n.x)}" y="${num(n.y)}" width="${num(n.w)}" height="${num(n.h)}"/></clipPath>`,
     `${body} fill="${th.nodeFill}" stroke="${th.nodeStroke}" stroke-width="${th.nodeStrokeWidth}"/>`,
-    iconSvgGroup(kind, th.nodeStroke, n.x + 8, n.y + 8, th.iconSize),
+    image
+      ? (() => {
+          const box = imageBox(n);
+          return `<image x="${num(n.x + box.x)}" y="${num(n.y + box.y)}" width="${num(box.w)}" height="${num(box.h)}" preserveAspectRatio="xMidYMid meet" href="${image}"/>`;
+        })()
+      : iconSvgGroup(kind, th.nodeStroke, n.x + 8, n.y + 8, th.iconSize),
     `<g clip-path="url(#${clipId})">`,
     ...labelLines.map(
       (line, i) => `<text x="${num(textX)}" y="${num(n.y + 18 + i * 14)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(line)}</text>`,

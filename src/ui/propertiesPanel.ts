@@ -12,6 +12,8 @@ import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
 import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
+import { prepareImage } from '../io/imageImport';
+import { clearNodeImage, resizeNode, setNodeImage } from '../model/imageActions';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 
@@ -25,6 +27,8 @@ export interface PanelContext {
   getDiagnostics(): Diagnostic[];
   /** 確認事項の項目から、該当の接続を選択する */
   selectEdge(edgeId: string): void;
+  /** 図が丸ごと入れ替わった(新規・読込)回数。画像の取り込みのような時間のかかる処理が、始めた図のままかの確認に使う */
+  getEpoch(): number;
   /** 操作の結果を状態表示へ出す */
   setStatus(kind: 'info' | 'ok' | 'warn' | 'error', text: string): void;
 }
@@ -351,7 +355,74 @@ export class PropertiesPanel {
       field(t('props.model'), model),
       field(t('props.count'), count),
       ...(node.count && node.count > 1 ? [el('p', { className: 'hint', text: t('props.unitPortsHint') })] : []),
+      this.sizeFields(node),
+      this.imageSection(node),
     ]);
+  }
+
+  /** 機器の幅・高さ。グリッドの倍数へ丸められ、ポートと文字が収まる最小より小さくはならない(結果は入力欄へ戻す) */
+  private sizeFields(node: DiagramNode): HTMLElement {
+    const doc = this.ctx.getDoc();
+    const step = doc.grid.enabled ? String(doc.grid.size) : '1';
+    const input = (prop: 'w' | 'h', dataProp: string) =>
+      el('input', {
+        attrs: { type: 'number', min: '1', step, value: String(Math.round(node[prop])), 'data-prop': dataProp },
+        on: {
+          change: (ev) => {
+            const raw = (ev.target as HTMLInputElement).value.trim();
+            const size = { w: node.w, h: node.h, [prop]: Number(raw) };
+            if (raw !== '') this.ctx.apply(resizeNode(this.ctx.pageId, node.id, size));
+            this.update(node.id); // 不正な値は元の値へ戻し、丸めや最小への補正は入力欄へ反映する
+          },
+        },
+      });
+    return el('div', { className: 'size-row' }, [field(t('props.width'), input('w', 'width')), field(t('props.height'), input('h', 'height'))]);
+  }
+
+  /** 機器の画像。ファイルを選ぶと、縮小・再符号化して図に入れる。外すと、小さなアイコンに戻る */
+  private imageSection(node: DiagramNode): HTMLElement {
+    const file = el('input', {
+      attrs: { type: 'file', accept: 'image/png,image/jpeg,image/webp', 'data-prop': 'image-file', hidden: '', tabindex: '-1' },
+      on: {
+        change: (ev) => {
+          const input = ev.target as HTMLInputElement;
+          const picked = input.files?.[0];
+          input.value = ''; // 同じファイルを続けて選んでも change が発火するよう、空に戻す
+          if (picked) void this.setImage(node.id, picked);
+        },
+      },
+    });
+    const choose = el('button', { text: t('props.imageChoose'), attrs: { type: 'button', 'data-action': 'image-choose' }, on: { click: () => file.click() } });
+    const remove = el('button', {
+      text: t('props.imageRemove'),
+      attrs: { type: 'button', 'data-action': 'image-remove', ...(node.imageId ? {} : { disabled: '' }) },
+      on: {
+        click: () => {
+          if (this.ctx.apply(clearNodeImage(this.ctx.pageId, node.id)).ok) this.ctx.setStatus('ok', t('status.imageRemoved'));
+        },
+      },
+    });
+    return el('div', { className: 'section', attrs: { 'data-section': 'image' } }, [
+      el('h3', { text: t('props.image') }),
+      el('div', { className: 'button-row' }, [choose, remove, file]),
+      el('p', { className: 'hint', text: t('props.imageHint') }),
+    ]);
+  }
+
+  /** いちばん新しい画像の取り込みの番号。古い取り込みが、あとから完了しても、結果を捨てるために使う */
+  private imageRequest = 0;
+
+  private async setImage(nodeId: string, file: File): Promise<void> {
+    const request = ++this.imageRequest;
+    const epoch = this.ctx.getEpoch();
+    const prepared = await prepareImage(file);
+    // 取り込みの間に、新しい取り込みを始めた・図が入れ替わった(新規・開く)ときは、この結果は使わない(別の図の同じIDの機器に付けないため)
+    if (request !== this.imageRequest || epoch !== this.ctx.getEpoch()) return;
+    if (!prepared.ok) {
+      this.ctx.setStatus('error', t(`error.image.${prepared.error}` as MessageKey));
+      return;
+    }
+    if (this.ctx.apply(setNodeImage(this.ctx.pageId, nodeId, prepared.image)).ok) this.ctx.setStatus('ok', t('status.imageSet'));
   }
 
   private portSection(doc: DiagramDocument, node: DiagramNode): HTMLElement {

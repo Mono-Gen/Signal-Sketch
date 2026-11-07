@@ -1,5 +1,6 @@
 import type { Action, ActionResult } from '../model/actions';
 import { documentLimitIssue } from '../model/docLimits';
+import { usedAssets } from '../model/imageActions';
 import type { DiagramDocument } from '../model/types';
 
 type Listener = () => void;
@@ -15,6 +16,7 @@ export class DocumentStore {
   private listeners = new Set<Listener>();
   private revision = 0;
   private savedRevision = 0;
+  private replaceCount = 0;
 
   constructor(initial: DiagramDocument, private readonly historyLimit = 100) {
     this.current = structuredClone(initial);
@@ -22,6 +24,11 @@ export class DocumentStore {
 
   get doc(): DiagramDocument {
     return this.current;
+  }
+
+  /** 図が丸ごと入れ替わった(新規・読込)回数。時間のかかる処理(画像の取り込みなど)が、始めた図のままかの確認に使う */
+  get epoch(): number {
+    return this.replaceCount;
   }
 
   get canUndo(): boolean {
@@ -44,9 +51,17 @@ export class DocumentStore {
 
   apply(action: Action): ActionResult {
     // 複製に対して実行し、失敗時は現在の状態をそのまま保つ
-    const draft = structuredClone(this.current);
+    // 画像(assets)は大きく(最大5MB)、操作のたびに複製して履歴に積むとメモリを使い切るので、複製せず共有する。
+    // 画像は書き換えず、変えるときは新しいオブジェクトに差し替える決まり(setNodeImage)なので、共有しても履歴は壊れない
+    const { assets, ...rest } = this.current;
+    const draft = { ...structuredClone(rest), assets } as DiagramDocument;
     const result = action(draft);
     if (!result.ok) return result;
+    // どの機器からも使われなくなった画像は、図から外す(外す・差し替える・機器を消すたびに、枚数の上限へ近づかないよう)
+    if (draft.assets && Object.keys(draft.assets).length > 0) {
+      const used = usedAssets(draft);
+      if (Object.keys(used).length !== Object.keys(draft.assets).length) draft.assets = used;
+    }
     // 図全体の上限(機器・ポート・接続の数)。追加・貼り付け・台数の変更などのどの操作でも、超える結果は適用しない
     if (documentLimitIssue(draft)) return { ok: false, error: 'document-too-large' };
     this.undoStack.push(this.current);
@@ -81,6 +96,7 @@ export class DocumentStore {
   /** ドキュメントを丸ごと差し替える(新規・読込)。履歴は破棄し、保存済みの状態とみなす */
   replace(doc: DiagramDocument): void {
     this.current = structuredClone(doc);
+    this.replaceCount++;
     this.undoStack = [];
     this.redoStack = [];
     this.revision++;

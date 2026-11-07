@@ -1,3 +1,4 @@
+import { usedAssets } from '../model/imageActions';
 import { validateDocument } from '../model/validate';
 import type { DiagramDocument } from '../model/types';
 
@@ -5,7 +6,8 @@ import type { DiagramDocument } from '../model/types';
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
 export function serializeDocument(doc: DiagramDocument): string {
-  return JSON.stringify(doc, null, 2);
+  // どの機器からも使われていない画像は保存しない(外した画像で、ファイルが膨らまないように)
+  return JSON.stringify({ ...doc, assets: usedAssets(doc) }, null, 2);
 }
 
 export type ParseResult = { ok: true; doc: DiagramDocument } | { ok: false; errors: string[] };

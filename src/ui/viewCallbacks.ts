@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import type { MessageKey } from '../i18n';
 import { addEdge, addEdges, movePort } from '../model/actions';
+import { resizeNodeRect } from '../model/imageActions';
 import type { Action, ActionResult } from '../model/actions';
 import { moveSelection, resizeFrame } from '../model/frames';
 import type { DiagramView, ViewCallbacks } from '../view/diagramView';
@@ -31,6 +32,10 @@ export function createViewCallbacks(deps: ViewCallbacksDeps): ViewCallbacks {
   return {
     onMove(moves, frameMoves) {
       if (!apply(moveSelection(pageId, moves, frameMoves)).ok) deps.getView().render(); // 失敗した場合は、画面の位置をモデルに合わせて戻す
+    },
+    onNodeResize(nodeId, rect, fitImage) {
+      // 最小より小さい・ページの外などは、モデルが補正して反映する。失敗した場合は、画面の大きさをモデルに合わせて戻す
+      if (!apply(resizeNodeRect(pageId, nodeId, rect, { fitImage })).ok) deps.getView().render();
     },
     onFrameResize(frameId, rect) {
       if (!apply(resizeFrame(pageId, frameId, rect)).ok) deps.getView().render(); // 小さすぎる等は元の大きさへ戻す

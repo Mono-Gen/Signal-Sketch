@@ -18,10 +18,11 @@ Place devices, define their ports, and connect ports with the mouse. Lines are r
 - Box-select several devices to delete, copy or move them together; Shift+drop a device from the palette to add several in a row
 - Export: JSON (save/open), SVG and PNG (text kept as real text, so it pastes into PowerPoint), CSV device list
 - Import a device list (CSV) to create a first draft of devices and frames (no connections); the header row must match the exported CSV exactly. Details in the user guide; a sample is in [docs/sample_devices.csv](docs/sample_devices.csv)
+- Set your own images on devices (PNG / JPEG / WebP, stored inside the diagram file) and change device sizes
 - Japanese / English UI switching
 - Runs from a single HTML file opened in a browser: no server, no installation
 
-Not yet available: importing custom icons, multiple pages, direct `.pptx` export.
+Not yet available: registering reusable custom devices, multiple pages, direct `.pptx` export.
 
 ## Using it
 
@@ -72,6 +73,8 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 ## Third-party software and trademarks
 
 The build output bundles [maxGraph](https://github.com/maxGraph/maxGraph) (Apache License 2.0). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [licenses/](licenses/).
+
+Images you set on devices are yours: you are responsible for the rights to them (copyright, trademarks and so on). The project ships no device images.
 
 Product and company names mentioned here (for example PowerPoint, Excel, Edge, Chrome, Firefox, Safari, HDMI, USB) belong to their respective owners and are used only to describe compatibility. This project is not affiliated with them.
 

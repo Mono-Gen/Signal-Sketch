@@ -1,4 +1,4 @@
-import { Cell, CellState, ConnectionHandler, EventObject, Graph, InternalEvent, PopupMenuHandler, RubberBandHandler, TooltipHandler, getDefaultPlugins } from '@maxgraph/core';
+import { Cell, CellState, ConnectionHandler, EventObject, Graph, InternalEvent, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
 import { markerSpec } from '../model/portMarker';
@@ -8,6 +8,7 @@ import type { Port } from '../model/ports';
 import type { PortRef, Side } from '../model/types';
 import type { DocumentStore } from '../state/store';
 import { escapeHtml } from '../util/escapeHtml';
+import { imageBox, isImageDataUri } from '../model/images';
 import { iconDataUri } from './icons';
 import { PortInteractions } from './portInteractions';
 import { portTooltipHtml } from './portTooltip';
@@ -21,6 +22,8 @@ export interface ViewCallbacks {
   onMove(moves: { id: string; x: number; y: number }[], frameMoves: { id: string; x: number; y: number }[]): void;
   /** 枠の変形(ハンドル操作)。位置とサイズ */
   onFrameResize(frameId: string, rect: { x: number; y: number; w: number; h: number }): void;
+  /** 機器の変形(ハンドル操作)。位置とサイズ。fitImage は Shift を押していたか(画像の縦横比に合わせる) */
+  onNodeResize(nodeId: string, rect: { x: number; y: number; w: number; h: number }, fitImage: boolean): void;
   onConnect(from: PortRef, to: PortRef): void;
   /** ポートを別の辺・位置へ動かす要求(位置は辺に沿った座標。丸めと吸着はモデル側) */
   onPortMove(nodeId: string, portId: string, side: Side, pos: number): void;
@@ -30,6 +33,22 @@ export interface ViewCallbacks {
   onPortsSelected(count: number): void;
   /** 選んだポートを、別のポートへまとめてつなぐ操作(割り当ては計画済み。反映はモデル側) */
   onBulkConnect(plan: BulkPlan): void;
+}
+
+let nodeConstrainPatched = false;
+
+/**
+ * 機器(セルID が n: で始まる)の変形だけ、maxGraph 標準の「Shift で縦横比を固定する」を無効にする。
+ * VertexHandler は枠などと共通なので、プロトタイプ全体を書き換えずに、機器のときだけ false を返す関数へ差し替える(一度だけ)。
+ */
+function patchNodeConstrainedEvent(): void {
+  if (nodeConstrainPatched) return;
+  nodeConstrainPatched = true;
+  const original = VertexHandler.prototype.isConstrainedEvent;
+  VertexHandler.prototype.isConstrainedEvent = function (this: VertexHandler, me) {
+    const id = this.state.cell?.getId();
+    return typeof id === 'string' && id.startsWith('n:') ? false : original.call(this, me);
+  };
 }
 
 const SIDE_TO_CONSTRAINT = { left: 'west', right: 'east', top: 'north', bottom: 'south' } as const;
@@ -42,6 +61,8 @@ export class DiagramView {
   private readonly graph: Graph;
   private readonly portInfo = new Map<string, PortRef>();
   private readonly nodeByCell = new Map<string, string>();
+  /** 直前のポインタ操作を離したとき、Shift が押されていたか(機器の変形で、画像の縦横比に合わせるかの判定) */
+  private shiftAtRelease = false;
   private readonly edgeByCell = new Map<string, string>();
   private readonly frameByCell = new Map<string, string>();
   private readonly portLabels = new Map<string, string>();
@@ -257,7 +278,32 @@ export class DiagramView {
       const id = cell.getId() as string;
       return this.nodeByCell.has(id) || this.frameByCell.has(id);
     };
-    g.isCellResizable = (cell: Cell) => this.frameByCell.has(cell.getId() as string);
+    // 枠は常に変形できる。機器は、1つだけ選んでいるときに変形できる(複数選択では、動かすだけ)。ポートやアイコンは変形しない
+    g.isCellResizable = (cell: Cell) => {
+      const id = cell.getId() as string;
+      return this.frameByCell.has(id) || (this.nodeByCell.has(id) && g.getSelectionCount() <= 1);
+    };
+    // maxGraph 標準は、Shift を押した変形で、最初の縦横比を固定する。機器では「画像の縦横比に合わせる」(名前の行と余白が固定なので、
+    // 一定の比率にはならない)をモデルが決めるので、機器だけは標準の固定を使わない(Shift でも、ドラッグした大きさをそのまま渡す)。
+    // 枠は従来どおり(Shift で縦横比を固定)
+    patchNodeConstrainedEvent();
+    // 複数選択のときは、変形のハンドルを出さない(標準の設定: 選択が maxCells 個未満のときだけハンドルを作る)。
+    // ハンドルは、選択が変わっても、すでに選ばれていたセルのものが使い回されるので、1つだけの選択から複数選択に変わったときは作り直す
+    const handlers = g.getPlugin('SelectionCellsHandler') as SelectionCellsHandler | undefined;
+    if (handlers) {
+      (handlers as unknown as { maxCells: number }).maxCells = 2;
+      handlers.maxHandlers = 2;
+    }
+    let wasSingle = true;
+    g.getSelectionModel().addListener(InternalEvent.CHANGE, () => {
+      const single = g.getSelectionCount() <= 1;
+      if (single === wasSingle) return;
+      wasSingle = single;
+      handlers?.reset();
+      handlers?.refresh();
+    });
+    // 変形のドラッグを離したとき、Shift を押していたか(ハンドルのドラッグ中は押し続けているので、離す時点の状態で足りる)
+    this.container.addEventListener('pointerup', (ev) => (this.shiftAtRelease = ev.shiftKey), true);
     g.isCellSelectable = (cell: Cell) => {
       const id = cell.getId() as string;
       return this.nodeByCell.has(id) || this.edgeByCell.has(id) || this.frameByCell.has(id);
@@ -286,11 +332,26 @@ export class DiagramView {
     });
 
     g.addListener(InternalEvent.CELLS_RESIZED, (_sender: unknown, evt: EventObject) => {
+      // 描き直しの最中の通知(子のセルを足したときの、親の大きさの補正など)は、利用者の変形ではない。
+      // 反映すると、モデルの更新 → 描き直し → 通知 … と繰り返して止まらなくなる
+      if (this.rendering) return;
       const cells = (evt.getProperty('cells') ?? []) as Cell[];
       for (const c of cells) {
-        const frameId = this.frameByCell.get(c.getId() as string);
+        const id = c.getId() as string;
+        const frameId = this.frameByCell.get(id);
+        const nodeId = this.nodeByCell.get(id);
         const geo = c.getGeometry();
         if (frameId && geo) setTimeout(() => this.callbacks.onFrameResize(frameId, { x: geo.x, y: geo.y, w: geo.width, h: geo.height }), 0);
+        const model = nodeId ? this.store.doc.pages[0].nodes.find((n) => n.id === nodeId) : undefined;
+        const unchanged = model && geo && model.x === geo.x && model.y === geo.y && model.w === geo.width && model.h === geo.height;
+        if (unchanged) {
+          // ハンドルを押しただけで動かさなかった。何も変えない(元に戻すの履歴に、変化のない操作を積まない)
+        } else if (nodeId && geo && g.getSelectionCount() > 1) {
+          setTimeout(() => this.render(), 0); // 複数選択の変形は受け付けない(ハンドルは出ないが、念のため。画面を元の大きさに戻す)
+        } else if (nodeId && geo) {
+          const fit = this.shiftAtRelease;
+          setTimeout(() => this.callbacks.onNodeResize(nodeId, { x: geo.x, y: geo.y, w: geo.width, h: geo.height }, fit), 0);
+        }
       }
     });
 
@@ -403,6 +464,9 @@ export class DiagramView {
         const tpl = doc.deviceTemplates.find((x) => x.id === n.templateId);
         const kind = tpl?.kind ?? 'generic';
         const shape = tpl?.shape ?? 'roundRect';
+        // 画像のある機器は、小さなアイコンの代わりに画像を出す(画像が壊れている・無いときは、アイコンのまま)
+        const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
+        const image = isImageDataUri(imageUri) ? imageUri : undefined;
         const countText = n.count ? ` ${t('node.count', { count: n.count })}` : '';
         const modelLine = n.model || countText ? `<br><span style="font-size:11px;font-weight:normal;color:${th.modelText}">${escapeHtml(n.model)}${escapeHtml(countText)}</span>` : '';
         const nodeCell = g.insertVertex({
@@ -425,21 +489,33 @@ export class DiagramView {
             overflow: 'hidden',
             verticalAlign: 'top',
             align: 'left',
-            spacingLeft: th.iconSize + 14,
+            spacingLeft: image ? 14 : th.iconSize + 14,
             spacingTop: 6,
           },
         });
         nodeCell.setConnectable(false);
         this.nodeByCell.set(`n:${n.id}`, n.id);
 
-        const icon = g.insertVertex({
-          parent: nodeCell,
-          id: `i:${n.id}`,
-          position: [8, 8],
-          size: [th.iconSize, th.iconSize],
-          style: { shape: 'image', image: iconDataUri(kind, th.nodeStroke) },
-        });
-        icon.setConnectable(false);
+        if (image) {
+          const box = imageBox(n);
+          const pic = g.insertVertex({
+            parent: nodeCell,
+            id: `i:${n.id}`,
+            position: [box.x, box.y],
+            size: [box.w, box.h],
+            style: { shape: 'image', image, imageAspect: true },
+          });
+          pic.setConnectable(false);
+        } else {
+          const icon = g.insertVertex({
+            parent: nodeCell,
+            id: `i:${n.id}`,
+            position: [8, 8],
+            size: [th.iconSize, th.iconSize],
+            style: { shape: 'image', image: iconDataUri(kind, th.nodeStroke) },
+          });
+          icon.setConnectable(false);
+        }
 
         const ports = getNodePorts(doc, n);
         const placements = layoutNodePorts(doc, n);

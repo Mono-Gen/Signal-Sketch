@@ -56,6 +56,8 @@ export interface DiagramNode {
   /** 台数表記(×N台) */
   count?: number;
   iconOverride?: string;
+  /** 機器の中に表示する画像(図の assets の ID)。なければ、種類ごとの小さなアイコンを出す */
+  imageId?: string;
   note?: string;
   /** 機器ごとにテンプレートと別のポート構成にする場合 */
   portGroupsOverride?: PortGroup[];

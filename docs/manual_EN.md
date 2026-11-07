@@ -77,6 +77,16 @@ Right-click on the diagram to open a menu with the actions available at that spo
 - Devices are pasted a little to the lower right each time. A frame is copied with the devices inside it, and pasted where it overlaps other devices and frames as little as possible.
 - Ctrl+drag is an ordinary move, not a copy. Copying works only within the same window (you cannot paste into another window).
 
+### Device size and images
+
+- With a single device selected, **drag its corner or edge handles to resize it** (when you drag a left or top handle, the right and bottom edges stay put). For a device with an image, **hold Shift while dragging to fit the size to the image's aspect ratio** (no margins, except for a little left over by grid rounding when grid snap is on). Without Shift you can resize freely; the image is never distorted and the extra space becomes margins. With several devices selected they cannot be resized.
+- Select a device and the panel also shows **Width** and **Height** (for when you want to type a value). Values are rounded to the grid (when grid snap is on) and cannot go below the size the ports and text need. A device cannot be larger than the page (except a device whose minimum size, set by its ports and text, already exceeds the page). Connections are kept; only the port positions change.
+- **Choose image…** sets your own image on a device (PNG, JPEG or WebP, up to 5 MB and 40 million pixels for the original file). It is shown **keeping its aspect ratio** in the area below the name line. Right after you set it, the device keeps its width and its height grows to fit the image. You can change the width and height afterwards. **Remove image** brings back the small icon.
+- On import the image is shrunk to at most 640 px on its longest side and stored inside the diagram file (the original is not kept; handing over the diagram file hands over the images too). Images that are no longer used are dropped when you save. One diagram can hold up to 50 images, 5 MB in total.
+- A JPEG cannot be transparent, so its white background stays. **For dark mode, a PNG with a transparent background works best.** SVG images are not supported.
+- Copying or duplicating a device shares the same image. SVG and PNG exports include the images.
+- Rights to the images (copyright, trademarks and so on) are your responsibility.
+
 ### Devices with a quantity of two or more
 
 With a quantity of 2 or more, **ports are shown for every unit**, so each unit can be connected to a different destination. Tooltips show which unit, such as "LAN (Unit 3)". If lowering the quantity would remove connected ports, you are asked to confirm.
@@ -211,7 +221,7 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 ## 11. Known limitations
 
 - A diagram is a single page. Multiple pages are not supported.
-- Only the standard device icons are available (importing your own images is not supported).
+- Images are set per device (there is no way to register an image once and place it from the palette). SVG images, cropping and rotating are not supported.
 - You cannot adjust line routes by hand.
 - There are size limits (they keep the screen from freezing). Per device: a quantity of 1 to 999 and at most 5000 ports in total. Per page: 2000 devices, 20000 ports in total and 20000 connections. A diagram file can be up to 20 MB, and a device-list CSV up to 5 MB (10000 data rows). Files over a limit cannot be opened.
 - While dragging a frame, the devices inside do not follow; they all move when you drop it.
