@@ -42,7 +42,7 @@ If the devices do not fit, you can enlarge the page (the drawing area). With not
 ## 3. Placing devices
 
 - **Click** a palette item to add it at a free spot, or **drag** it to place it where you want.
-- Standard devices: generic device, PC, touch panel, camera, microphone, speaker, amplifier, display, encoder, decoder, and switches (8/16/24/48 ports).
+- Standard devices: generic device, PC, touch panel, camera, microphone, speaker, amplifier, display, encoder, decoder, and switch (8 ports). You can change the number of ports of a switch in the right panel after placing it (24 ports, 48 ports and so on).
 - Drag a device to move it. Positions and sizes snap to a **10 px grid** (toggle with "Snap to grid" in the toolbar).
 - Select a device to edit its **name, model and quantity** in the right panel. A value is committed when you leave the field or press Tab.
 
@@ -175,12 +175,12 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 | 型番 / Model | The model |
 | 台数 / Quantity | An integer from 1 to 999 (1 if empty). It becomes the **quantity of one device** (one set of ports per unit) |
 | 種類 / Type | The name of a standard device (below). A generic device if empty |
-| ポート数 / Ports | An integer (may be empty). **Not used on import** (the port layout comes from the standard device of that type) |
+| ポート数 / Ports | An integer (may be empty). On rows whose type is "Switch", it is **used as the number of LAN ports** (empty or 0 means 8; at most 5000 ports per device, counting every unit). For other types it is not used on import (the port layout comes from the standard device of that type) |
 | 場所 / Location | Devices with the same location are grouped into a frame of that name. Empty means no frame |
 
 - **Only headers identical to the names above (Japanese or English) are accepted** (leading and trailing spaces are ignored). Other names such as "Device", "Machine" or "name" are not accepted. The column order is free.
 - **Columns with an unknown header** (such as notes) are not imported, and the confirmation shows "Column not imported" (so a misspelled header is noticed).
-- **A type matches only when it is identical to the name of a standard device** (full-width/half-width and upper/lower case all count; only spaces at the start and end of a cell are ignored). Japanese: 汎用機器 / PC / タッチパネル / カメラ / マイク / スピーカ / アンプ / ディスプレイ / エンコーダ / デコーダ / スイッチ 8ポート / スイッチ 16ポート / スイッチ 24ポート / スイッチ 48ポート. English: Generic device / PC / Touch panel / Camera / Microphone / Speaker / Amplifier / Display / Encoder / Decoder / Switch 8 ports / Switch 16 ports / Switch 24 ports / Switch 48 ports. A type that does not match (including the name of a device that exists only in this diagram) becomes a **generic device**, and the confirmation lists it.
+- **A type matches only when it is identical to the name of a standard device** (full-width/half-width and upper/lower case all count; only spaces at the start and end of a cell are ignored). Japanese: 汎用機器 / PC / タッチパネル / カメラ / マイク / スピーカ / アンプ / ディスプレイ / エンコーダ / デコーダ / スイッチ. English: Generic device / PC / Touch panel / Camera / Microphone / Speaker / Amplifier / Display / Encoder / Decoder / Switch. A type that does not match (including the name of a device that exists only in this diagram) becomes a **generic device**, and the confirmation lists it.
 - Importing an exported CSV keeps name, model, quantity, type and location, but **the port layout returns to the standard one**, and identical devices that were placed separately are merged into one device (with a quantity).
 - **Layout**: one frame per location, with devices laid out left to right and wrapped inside it. Placement starts below the existing devices and frames, and **anything that does not fit on the page is not placed** (the page is never enlarged; devices that could not be placed are listed in the confirmation). If nothing can be placed, you are told to enlarge the page.
 - **Errors** (nothing is added): no "Name" column in the first row or the same column twice, a row with an empty name, a quantity or port count that cannot be used, an unclosed quotation mark. They are shown with row numbers.

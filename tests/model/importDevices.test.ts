@@ -24,11 +24,11 @@ const overlap = (a: ReturnType<typeof rect>, b: ReturnType<typeof rect>) => a.x 
 describe('importDevices: 追加と配置', () => {
   it('機器を追加し、名称・型番・台数・種類が入る。台数が2以上は1つの機器の台数、1なら台数表記なし', () => {
     const doc = createEmptyDocument();
-    const r = importDevices(P, [row('Cam', { model: 'M1', quantity: 3, presetId: 'camera' }), row('Sw', { presetId: 'switch8' })], options)(doc);
+    const r = importDevices(P, [row('Cam', { model: 'M1', quantity: 3, presetId: 'camera' }), row('Sw', { presetId: 'switch' })], options)(doc);
     expect(r.ok).toBe(true);
     const [cam, sw] = doc.pages[0].nodes;
     expect(cam).toMatchObject({ label: 'Cam', model: 'M1', count: 3, templateId: 'preset-camera' });
-    expect(sw).toMatchObject({ label: 'Sw', model: '', templateId: 'preset-switch8' });
+    expect(sw).toMatchObject({ label: 'Sw', model: '', templateId: 'preset-switch' });
     expect(sw.count).toBeUndefined();
     expect(getNodePorts(doc, cam).filter((p) => p.unit === 3).length).toBeGreaterThan(0); // 台数ぶんのポートが付く
     expect(r.createdNodeIds).toEqual(doc.pages[0].nodes.map((n) => n.id));
@@ -111,7 +111,7 @@ describe('importDevices: 追加と配置', () => {
 
   it('接続は作らない', () => {
     const doc = createEmptyDocument();
-    importDevices(P, [row('A', { presetId: 'camera' }), row('B', { presetId: 'switch8' })], options)(doc);
+    importDevices(P, [row('A', { presetId: 'camera' }), row('B', { presetId: 'switch' })], options)(doc);
     expect(doc.pages[0].edges).toEqual([]);
   });
 
@@ -160,7 +160,7 @@ describe('importDevices: ページに収まらない場合', () => {
   it('1台の幅がページより広い機器は、飛ばして残りを置く', () => {
     const doc = createEmptyDocument();
     setPageSize(P, { w: 640, h: 720 })(doc);
-    const r = importDevices(P, [row('Big', { presetId: 'switch48', quantity: 3 }), row('Small')], options)(doc);
+    const r = importDevices(P, [row('Big', { presetId: 'switch', ports: 48, quantity: 3 }), row('Small')], options)(doc);
     expect(r.ok).toBe(true);
     expect(doc.pages[0].nodes.map((n) => n.label)).toEqual(['Small']);
     expect(r.unplaced).toEqual(['Big']);
@@ -194,6 +194,41 @@ describe('importDevices: 元に戻す・失敗時', () => {
   });
 });
 
+describe('importDevices: スイッチのポート数', () => {
+  it('ポート数を指定したスイッチは、その機器だけLANポートがその数になる(標準のテンプレートは8のまま)', () => {
+    const doc = createEmptyDocument();
+    const r = importDevices(P, [row('S24', { presetId: 'switch', ports: 24 }), row('S8', { presetId: 'switch' })], options)(doc);
+    expect(r.ok).toBe(true);
+    const nodes = doc.pages[0].nodes;
+    const s24 = nodes.find((n) => n.label === 'S24')!;
+    const s8 = nodes.find((n) => n.label === 'S8')!;
+    expect(s24.portGroupsOverride?.[0].count).toBe(24);
+    expect(s8.portGroupsOverride).toBeUndefined();
+    expect(s24.w).toBeGreaterThan(s8.w); // 24ポートぶん広い
+    expect(doc.deviceTemplates.find((t) => t.id === 'preset-switch')!.portGroups[0].count).toBe(8);
+  });
+
+  it('標準と同じ8ポートの指定なら、上書きは作らない', () => {
+    const doc = createEmptyDocument();
+    importDevices(P, [row('S', { presetId: 'switch', ports: 8 })], options)(doc);
+    expect(doc.pages[0].nodes[0].portGroupsOverride).toBeUndefined();
+  });
+
+  it('スイッチ以外の種類では、ポート数の指定は無視される', () => {
+    const doc = createEmptyDocument();
+    importDevices(P, [row('Cam', { presetId: 'camera', ports: 24 })], options)(doc);
+    expect(doc.pages[0].nodes[0].portGroupsOverride).toBeUndefined();
+  });
+
+  it('台数が複数でも、ポート数の指定を反映する(1台あたり)', () => {
+    const doc = createEmptyDocument();
+    importDevices(P, [row('S', { presetId: 'switch', ports: 24, quantity: 2 })], options)(doc);
+    const n = doc.pages[0].nodes[0];
+    expect(n.count).toBe(2);
+    expect(n.portGroupsOverride?.[0].count).toBe(24);
+  });
+});
+
 describe('機器一覧CSV: 書き出し → 読み込みの往復と、見本', () => {
   const headers = { name: '名称', model: '型番', quantity: '台数', kind: '種類', ports: 'ポート数', place: '場所' };
 
@@ -224,9 +259,9 @@ describe('機器一覧CSV: 書き出し → 読み込みの往復と、見本', 
     expect(exported.ok).toBe(true);
   });
 
-  it('書き出したCSVを読み込むと、名称・型番・台数・種類・場所が保たれる(ポート構成は標準に戻る)', () => {
+  it('書き出したCSVを読み込むと、名称・型番・台数・種類・場所が保たれる(スイッチはポート数も保たれ、ほかの機器のポート構成は標準に戻る)', () => {
     const src = createEmptyDocument();
-    importDevices(P, [row('Cam', { model: 'M1', quantity: 2, presetId: 'camera', place: 'Room' }), row('SW', { presetId: 'switch24', place: 'Rack' }), row('Misc')], options)(src);
+    importDevices(P, [row('Cam', { model: 'M1', quantity: 2, presetId: 'camera', place: 'Room' }), row('SW', { presetId: 'switch', ports: 24, place: 'Rack' }), row('Misc')], options)(src);
     const csv = buildDeviceCsv(src, headers);
 
     const parsed = parseDeviceCsv(csv);

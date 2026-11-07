@@ -1,7 +1,7 @@
 import { dictionaries } from '../i18n';
 import type { MessageKey } from '../i18n';
 import { exceedsPortLimit, MAX_UNITS } from '../model/ports';
-import { PRESETS } from '../model/presets';
+import { PRESETS, switchPortGroups, VARIABLE_PORT_PRESET_ID } from '../model/presets';
 
 // 機器一覧CSVの読み込み(解析・検証)。書き出し(csvExport.ts)と同じ形のCSVを、人が作って読み込む。
 // 見出しは、書き出しと同じ正式な名前(日本語または英語)だけを受け付ける。別名・表記の揺れは受け付けない
@@ -168,6 +168,8 @@ export interface DeviceRow {
   /** CSVに書かれていた種類(警告・確認画面の表示用。空なら空) */
   kindText: string;
   place: string;
+  /** スイッチの行で「ポート数」が指定されていれば、そのLANポート数(1以上)。ほかの種類・未指定・0のときは無し */
+  ports?: number;
 }
 
 export type CsvImportError =
@@ -180,7 +182,8 @@ export type CsvImportError =
   | { code: 'row-quantity-invalid'; line: number; value: string }
   /** 台数ぶんのポートの合計が、1機器あたりの上限を超える */
   | { code: 'row-too-many-ports'; line: number; value: string }
-  | { code: 'row-ports-invalid'; line: number; value: string };
+  | { code: 'row-ports-invalid'; line: number; value: string }
+  | { code: 'row-ports-too-many'; line: number; value: string };
 
 export type CsvImportWarning =
   | { code: 'unknown-column'; header: string }
@@ -292,7 +295,16 @@ export function parseDeviceCsv(text: string): DeviceCsvResult {
       if (found) presetId = found;
       else warnings.push({ code: 'unknown-kind', line: r.line, value: kindText });
     }
-    rows.push({ line: r.line, name, model: cellOf(r, 'model'), quantity, presetId, kindText, place: cellOf(r, 'place') });
+    // スイッチだけは、ポート数の列をLANポート数として使う(0・空は標準のまま)。上限は台数ぶんを含めて確認する
+    const portsCount = presetId === VARIABLE_PORT_PRESET_ID && portsText !== '' ? Number(portsText) : 0;
+    if (portsCount > 0) {
+      const switchDef = PRESETS.find((p) => p.id === VARIABLE_PORT_PRESET_ID);
+      if (exceedsPortLimit(switchPortGroups(switchDef?.portGroups ?? [], portsCount), quantity)) {
+        errors.push({ code: 'row-ports-too-many', line: r.line, value: portsText });
+        continue;
+      }
+    }
+    rows.push({ line: r.line, name, model: cellOf(r, 'model'), quantity, presetId, kindText, place: cellOf(r, 'place'), ...(portsCount > 0 ? { ports: portsCount } : {}) });
   }
   if (errors.length > 0) return { ok: false, errors };
   if (extraRows > 0) warnings.push({ code: 'extra-cells', line: extraFirstLine, rows: extraRows });

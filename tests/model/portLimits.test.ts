@@ -102,8 +102,9 @@ describe('操作(パネルの入力)でも、上限を超える値は断り、�
     expect(updateNode(P, id, { count: MAX_UNITS })(doc).ok).toBe(true); // 2 × 999 = 1998
   });
 
-  it('ポートの合計が上限を超える台数は断る(スイッチ48ポートは 104台まで)', () => {
-    const { doc, id } = setup('switch48');
+  it('ポートの合計が上限を超える台数は断る(LAN 48ポートの機器は 104台まで)', () => {
+    const { doc, id } = setup('switch');
+    expect(setPortGroups(P, id, [{ ...g(48), id: 'lan' }])(doc).ok).toBe(true);
     expect(updateNode(P, id, { count: 104 })(doc).ok).toBe(true); // 4992
     expect(updateNode(P, id, { count: 105 })(doc)).toMatchObject({ ok: false, error: 'invalid-value' }); // 5040
   });
@@ -144,9 +145,15 @@ describe('操作(パネルの入力)でも、上限を超える値は断り、�
 describe('機器一覧CSVの読み込み: ポートの合計の上限', () => {
   const run = (row: string) => parseDeviceCsv(`名称,台数,種類\n${row}\n`);
 
-  it('台数ぶんのポートが上限を超える行は、行番号つきのエラー(スイッチ48ポート × 105台)', () => {
-    expect(run('SW,105,スイッチ 48ポート')).toEqual({ ok: false, errors: [{ code: 'row-too-many-ports', line: 2, value: '105' }] });
-    expect(run('SW,104,スイッチ 48ポート').ok).toBe(true);
+  it('スイッチのポート数を指定した行で、台数ぶんのポートが上限を超えると、行番号つきのエラー(48ポート × 105台)', () => {
+    const withPorts = (row: string) => parseDeviceCsv(`名称,台数,種類,ポート数\n${row}\n`);
+    expect(withPorts('SW,105,スイッチ,48')).toEqual({ ok: false, errors: [{ code: 'row-ports-too-many', line: 2, value: '48' }] });
+    expect(withPorts('SW,104,スイッチ,48').ok).toBe(true);
+  });
+
+  it('ポート数を指定しない標準のスイッチ(8ポート)は、台数ぶんの合計が5000までなら通る(625台まで)', () => {
+    expect(run('SW,625,スイッチ').ok).toBe(true); // 8 × 625 = 5000
+    expect(run('SW,626,スイッチ')).toEqual({ ok: false, errors: [{ code: 'row-too-many-ports', line: 2, value: '626' }] });
   });
 
   it('台数の上限(999)は、ポートが少ない機器なら通り、1000はエラー', () => {

@@ -15,7 +15,7 @@ describe('connectCandidates: 接続ドラッグ中の候補', () => {
   it('同じ信号の空きポートだけが候補になる(開始ポート自身・他の信号は含まない)', () => {
     const doc = createEmptyDocument();
     const cam = place(doc, 'camera', 'Cam', 40, 100); // lan-1(LAN), hdmi-1(HDMI)
-    const sw = place(doc, 'switch8', 'SW', 400, 100); // lan-1..8(LAN)
+    const sw = place(doc, 'switch', 'SW', 400, 100); // lan-1..8(LAN)
     const c = connectCandidates(doc, P, ref(cam, 'lan-1'));
     expect(keys(c)).toEqual(keys(Array.from({ length: 8 }, (_, i) => ref(sw, `lan-${i + 1}`))));
     expect(c.some((r) => r.nodeId === cam)).toBe(false); // 開始ポート自身と、カメラのHDMIは含まない
@@ -25,7 +25,7 @@ describe('connectCandidates: 接続ドラッグ中の候補', () => {
     const doc = createEmptyDocument();
     const cam = place(doc, 'camera', 'Cam', 40, 100);
     const other = place(doc, 'camera', 'Other', 40, 300);
-    const sw = place(doc, 'switch8', 'SW', 400, 100);
+    const sw = place(doc, 'switch', 'SW', 400, 100);
     addEdge(P, ref(other, 'lan-1'), ref(sw, 'lan-2'))(doc);
     const c = keys(connectCandidates(doc, P, ref(cam, 'lan-1')));
     expect(c).not.toContain(`${sw}/lan-2`);
@@ -49,7 +49,7 @@ describe('connectCandidates: 接続ドラッグ中の候補', () => {
   it('開始ポートが接続済み(複数可でない)なら、候補は空', () => {
     const doc = createEmptyDocument();
     const cam = place(doc, 'camera', 'Cam', 40, 100);
-    const sw = place(doc, 'switch8', 'SW', 400, 100);
+    const sw = place(doc, 'switch', 'SW', 400, 100);
     addEdge(P, ref(cam, 'lan-1'), ref(sw, 'lan-1'))(doc);
     expect(connectCandidates(doc, P, ref(cam, 'lan-1'))).toEqual([]);
   });

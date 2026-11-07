@@ -112,10 +112,34 @@ describe('officialHeaders / presetNameTable', () => {
     const t = presetNameTable();
     expect(t.get('カメラ')).toBe('camera');
     expect(t.get('Camera')).toBe('camera');
-    expect(t.get('スイッチ 8ポート')).toBe('switch8');
-    expect(t.get('Switch 8 ports')).toBe('switch8');
+    expect(t.get('スイッチ')).toBe('switch');
+    expect(t.get('Switch')).toBe('switch');
+    expect(t.get('スイッチ 8ポート')).toBeUndefined(); // 8/16/24/48ポートの別々の標準は無い(ポート数の列で指定する)
     expect(t.get('camera')).toBeUndefined(); // 大文字小文字は区別する
     expect(t.get('カメラ ')).toBeUndefined();
+  });
+});
+
+describe('parseDeviceCsv: スイッチのポート数', () => {
+  const rows = (text: string) => {
+    const r = parseDeviceCsv(text);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    return r.rows;
+  };
+  const head = '名称,台数,種類,ポート数\n';
+
+  it('スイッチの行は、ポート数の列をLANポート数として持つ', () => {
+    expect(rows(head + 'SW,1,スイッチ,24\n')[0].ports).toBe(24);
+  });
+
+  it('ポート数が空・0のスイッチ、スイッチ以外の種類では、ポート数は使わない(標準のまま)', () => {
+    const r = rows(head + 'A,1,スイッチ,\nB,1,スイッチ,0\nC,1,カメラ,24\nD,1,,5\n');
+    expect(r.map((x) => x.ports)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it('ポート数が整数でなければ従来どおりエラー', () => {
+    const r = parseDeviceCsv(head + 'SW,1,スイッチ,abc\n');
+    expect(r.ok).toBe(false);
   });
 });
 

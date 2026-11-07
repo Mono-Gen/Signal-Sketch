@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SIGNAL_TYPES } from '../../src/model/defaults';
 import { expandPortGroups } from '../../src/model/ports';
-import { PRESETS, isPresetTemplateId, presetTemplateId, presetToTemplate } from '../../src/model/presets';
+import { PRESETS, isPresetTemplateId, presetTemplateId, presetToTemplate, switchPortGroups } from '../../src/model/presets';
 import { KNOWN_ICON_KINDS } from '../../src/view/icons';
 
 describe('PRESETS(標準機器)', () => {
@@ -10,12 +10,18 @@ describe('PRESETS(標準機器)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('スイッチ 8/16/24/48 ポートがある(設計書 5.3)', () => {
-    for (const n of [8, 16, 24, 48]) {
-      const p = PRESETS.find((x) => x.id === `switch${n}`);
-      expect(p, `switch${n}`).toBeDefined();
-      expect(expandPortGroups(p!.portGroups)).toHaveLength(n);
-    }
+  it('スイッチは標準に1つだけ(8ポート)。ポート数は置いたあとに変える', () => {
+    const switches = PRESETS.filter((x) => x.kind === 'switch');
+    expect(switches.map((p) => p.id)).toEqual(['switch']);
+    expect(expandPortGroups(switches[0].portGroups)).toHaveLength(8);
+  });
+
+  it('switchPortGroups: LANポートの数だけを変え、元は変えない。指定なし・0は標準のまま', () => {
+    const base = PRESETS.find((x) => x.id === 'switch')!.portGroups;
+    expect(switchPortGroups(base, 24)[0].count).toBe(24);
+    expect(base[0].count).toBe(8);
+    expect(switchPortGroups(base, undefined)[0].count).toBe(8);
+    expect(switchPortGroups(base, 0)[0].count).toBe(8);
   });
 
   it.each(PRESETS.map((p) => [p.id, p] as const))('%s: ポート定義が有効で、標準の信号種別・アイコンを使っている', (_id, p) => {

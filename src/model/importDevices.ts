@@ -1,10 +1,11 @@
-import { addNodeFromTemplate, updateNode } from './actions';
+import { addNodeFromTemplate, setPortGroups, updateNode } from './actions';
 import type { Action, ActionResult } from './actions';
 import { ceilToGrid } from './grid';
 import { uniqueId } from './ids';
 import { autoNodeSize, estimateTextWidth } from './nodeSize';
 import { getPage } from './query';
-import type { DeviceTemplate } from './types';
+import { switchPortGroups, VARIABLE_PORT_PRESET_ID } from './presets';
+import type { DeviceTemplate, PortGroup } from './types';
 
 /** 読み込む1行(検証済み。CSVの解析は io/csvImport.ts が行う) */
 export interface ImportRow {
@@ -16,11 +17,21 @@ export interface ImportRow {
   presetId: string;
   /** 場所。同じ場所の機器を、同じ名称の枠にまとめる。空なら枠なし */
   place: string;
+  /** スイッチのLANポート数(指定があるときだけ。ほかの種類では使わない) */
+  ports?: number;
 }
 
 export interface ImportOptions {
   /** 標準機器のIDから、図へ取り込むテンプレートを作る(名称は画面の言語で付ける。モデルは言語を持たない) */
   templateFor(presetId: string): DeviceTemplate;
+}
+
+/** この行の機器のポート構成。スイッチでポート数の指定があるときだけ、LANポートの数を変える */
+function effectiveGroups(row: ImportRow, tpl: DeviceTemplate): PortGroup[] {
+  if (row.presetId !== VARIABLE_PORT_PRESET_ID || !row.ports) return tpl.portGroups;
+  const groups = switchPortGroups(tpl.portGroups, row.ports);
+  // 標準と同じ数なら、上書きは作らない(機器のポート構成を標準のままにしておく)
+  return groups.every((g, i) => g.count === tpl.portGroups[i].count) ? tpl.portGroups : groups;
 }
 
 /** 枠の上の見出し(名称)の高さ */
@@ -29,6 +40,8 @@ const FRAME_HEADER = 30;
 interface Planned {
   row: ImportRow;
   tpl: DeviceTemplate;
+  /** この機器のポート構成。標準のままなら tpl.portGroups と同じ配列 */
+  groups: PortGroup[];
   w: number;
   h: number;
   x: number;
@@ -58,9 +71,10 @@ export function importDevices(pageId: string, rows: readonly ImportRow[], option
     const buckets = new Map<string, Planned[]>();
     for (const row of rows) {
       const tpl = options.templateFor(row.presetId);
-      const size = autoNodeSize({ groups: tpl.portGroups, label: row.name, model: row.model, grid: g, units: row.quantity > 1 ? row.quantity : undefined });
+      const groups = effectiveGroups(row, tpl);
+      const size = autoNodeSize({ groups, label: row.name, model: row.model, grid: g, units: row.quantity > 1 ? row.quantity : undefined });
       const list = buckets.get(row.place) ?? [];
-      list.push({ row, tpl, w: size.w, h: size.h, x: 0, y: 0 });
+      list.push({ row, tpl, groups, w: size.w, h: size.h, x: 0, y: 0 });
       buckets.set(row.place, list);
     }
     const order = [...buckets.keys()].filter((k) => k !== '');
@@ -145,6 +159,11 @@ export function importDevices(pageId: string, rows: readonly ImportRow[], option
       if (Object.keys(patch).length > 0) {
         const u = updateNode(pageId, r.created, patch)(doc);
         if (!u.ok) return u;
+      }
+      // スイッチのポート数が指定されていれば、この機器だけのポート構成にする(標準のテンプレートは変えない)
+      if (p.groups !== p.tpl.portGroups) {
+        const s = setPortGroups(pageId, r.created, p.groups)(doc);
+        if (!s.ok) return s;
       }
       createdNodeIds.push(r.created);
     }

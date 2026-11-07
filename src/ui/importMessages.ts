@@ -24,6 +24,8 @@ function errorText(e: CsvImportError): string {
       return t('import.error.rowName', { line: e.line });
     case 'row-quantity-invalid':
       return t('import.error.rowQuantity', { line: e.line, value: e.value });
+    case 'row-ports-too-many':
+      return t('import.error.rowPortsTooMany', { line: e.line, value: e.value });
     case 'row-too-many-ports':
       return t('import.error.rowTooManyPorts', { line: e.line, value: e.value });
     case 'row-ports-invalid':

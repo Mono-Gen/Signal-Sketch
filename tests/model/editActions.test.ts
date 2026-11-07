@@ -15,12 +15,12 @@ describe('addNodeFromTemplate', () => {
     const doc = fresh();
     const n = doc.pages[0].nodes.length;
     const tpls = doc.deviceTemplates.length;
-    const r = addNodeFromTemplate(P, preset('switch24'), 'SW')(doc);
+    const r = addNodeFromTemplate(P, preset('switch'), 'SW')(doc);
     expect(r.ok).toBe(true);
     expect(r.created).toBeDefined();
     expect(doc.pages[0].nodes).toHaveLength(n + 1);
     expect(doc.deviceTemplates).toHaveLength(tpls + 1);
-    expect(doc.deviceTemplates.at(-1)!.id).toBe('preset-switch24');
+    expect(doc.deviceTemplates.at(-1)!.id).toBe('preset-switch');
   });
 
   it('同じ標準機器をもう一度追加しても、テンプレートは増えない', () => {
@@ -58,9 +58,11 @@ describe('addNodeFromTemplate', () => {
     expect([node(doc, b.created!).x, node(doc, b.created!).y]).toEqual([43, 77]);
   });
 
-  it('サイズはポートに合わせた自動サイズ(スイッチ48ポートは幅490)', () => {
+  it('サイズはポートに合わせた自動サイズ(LAN 48ポートの機器は幅490)', () => {
     const doc = fresh();
-    const r = addNodeFromTemplate(P, preset('switch48'), 'SW48')(doc);
+    const base = PRESETS.find((p) => p.id === 'switch')!;
+    const wide = { ...base, portGroups: base.portGroups.map((g) => ({ ...g, count: 48 })) };
+    const r = addNodeFromTemplate(P, presetToTemplate(wide, 'SW48'), 'SW48')(doc);
     expect(node(doc, r.created!).w).toBe(490);
   });
 

@@ -22,12 +22,11 @@ const g = (
 
 const lan = (side: PortGroup['side'], count = 1): PortGroup => g('lan', 'LAN', 'inout', side, count, 'LAN ');
 
-const sw = (n: number): PresetDef => ({
-  id: `switch${n}`,
-  kind: 'switch',
-  shape: 'roundRect',
-  portGroups: [lan('bottom', n)],
-});
+/** ポート数を変えて使う標準機器(スイッチ)のID。置いたあとにパネルで変えられ、機器一覧(CSV)の「ポート数」でも指定できる */
+export const VARIABLE_PORT_PRESET_ID = 'switch';
+
+/** スイッチの標準のポート数 */
+export const DEFAULT_SWITCH_PORTS = 8;
 
 export const PRESETS: readonly PresetDef[] = [
   { id: 'generic', kind: 'generic', shape: 'roundRect', portGroups: [lan('left')] },
@@ -40,11 +39,16 @@ export const PRESETS: readonly PresetDef[] = [
   { id: 'display', kind: 'display', shape: 'roundRect', portGroups: [g('hdmi', 'HDMI', 'in', 'left', 1, 'HDMI '), lan('left')] },
   { id: 'encoder', kind: 'generic', shape: 'roundRect', portGroups: [g('hdmi', 'HDMI', 'in', 'left', 1, 'HDMI '), g('usb', 'USB', 'in', 'left', 1, 'USB '), lan('right')] },
   { id: 'decoder', kind: 'generic', shape: 'roundRect', portGroups: [lan('left'), g('hdmi', 'HDMI', 'out', 'right', 1, 'HDMI ')] },
-  sw(8),
-  sw(16),
-  sw(24),
-  sw(48),
+  { id: VARIABLE_PORT_PRESET_ID, kind: 'switch', shape: 'roundRect', portGroups: [lan('bottom', DEFAULT_SWITCH_PORTS)] },
 ];
+
+/**
+ * スイッチのLANポートを、指定の数に変えたポート構成を返す(元は変えない)。
+ * ポート数を指定しない・0のときは、標準のまま。
+ */
+export function switchPortGroups(groups: readonly PortGroup[], ports: number | undefined): PortGroup[] {
+  return groups.map((g) => (g.id === 'lan' && ports !== undefined && ports > 0 ? { ...g, count: ports } : { ...g }));
+}
 
 /** プリセットから図に取り込むテンプレートを作る。IDは `preset-<id>` で、再追加時に同じものを使う */
 export function presetToTemplate(def: PresetDef, name: string): DeviceTemplate {
