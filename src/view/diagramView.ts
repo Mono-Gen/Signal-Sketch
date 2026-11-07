@@ -1,4 +1,4 @@
-import { Cell, CellState, ConnectionHandler, EventObject, Graph, InternalEvent, RubberBandHandler, TooltipHandler, getDefaultPlugins } from '@maxgraph/core';
+import { Cell, CellState, ConnectionHandler, EventObject, Graph, InternalEvent, PopupMenuHandler, RubberBandHandler, TooltipHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
 import { markerSpec } from '../model/portMarker';
@@ -153,6 +153,13 @@ export class DiagramView {
     this.graph.clearSelection();
   }
 
+  /** 機器・枠・接続の選択を、まとめて置き換える(右クリックの前の選択を戻すのに使う。存在しないIDは無視する) */
+  setSelection(sel: { nodeIds: readonly string[]; edgeIds: readonly string[]; frameIds: readonly string[] }): void {
+    const model = this.graph.getDataModel();
+    const ids = [...sel.nodeIds.map((id) => `n:${id}`), ...sel.frameIds.map((id) => `g:${id}`), ...sel.edgeIds.map((id) => `e:${id}`)];
+    this.graph.setSelectionCells(ids.map((id) => model.getCell(id)).filter((c): c is Cell => c != null));
+  }
+
   /** 指定した機器・枠をまとめて選択する(貼り付けた直後の選択に使う) */
   selectItems(nodeIds: readonly string[], frameIds: readonly string[]): void {
     const model = this.graph.getDataModel();
@@ -255,6 +262,9 @@ export class DiagramView {
       const id = cell.getId() as string;
       return this.nodeByCell.has(id) || this.edgeByCell.has(id) || this.frameByCell.has(id);
     };
+    // maxGraph 標準のポップアップメニュー処理は、右ボタンを離したときに選択を変えてしまう(複数選択が子セル1つになる)。
+    // 右クリックのメニューはアプリ側(ui/contextMenu)が出すので、標準の処理は止める
+    (g.getPlugin('PopupMenuHandler') as PopupMenuHandler | undefined)?.setEnabled(false);
     const tooltip = g.getPlugin('TooltipHandler') as TooltipHandler;
     tooltip.getTooltipForCell = (cell: Cell) => this.portLabels.get(cell.getId() as string) ?? '';
 
@@ -529,6 +539,27 @@ export class DiagramView {
   graphToScreen(p: { x: number; y: number }): { x: number; y: number } {
     const tr = this.graph.getView().getTranslate();
     return { x: (p.x + tr.x) * this.zoom, y: (p.y + tr.y) * this.zoom };
+  }
+
+  /**
+   * イベントの位置にある、モデル側の対象(機器・枠・接続)。ポートの上は、そのポートを持つ機器として返す。
+   * 右クリックメニューが、何の上で開かれたかを知るために使う。何もなければ undefined。
+   */
+  targetAt(ev: MouseEvent): { kind: 'node' | 'frame' | 'edge'; id: string } | undefined {
+    const model = this.graph.getDataModel();
+    // 機器の中のアイコンなどの子セルに当たることがあるので、親をたどって機器・枠・接続を探す
+    for (let cell: Cell | null | undefined = (() => { const id = this.cellIdAt(ev); return id ? model.getCell(id) : undefined; })(); cell; cell = cell.getParent()) {
+      const id = cell.getId() as string;
+      const node = this.nodeByCell.get(id);
+      if (node) return { kind: 'node', id: node };
+      const frame = this.frameByCell.get(id);
+      if (frame) return { kind: 'frame', id: frame };
+      const edge = this.edgeByCell.get(id);
+      if (edge) return { kind: 'edge', id: edge };
+      const port = this.portInfo.get(id);
+      if (port) return { kind: 'node', id: port.nodeId };
+    }
+    return undefined;
   }
 
   /** イベントの位置にあるセルのID(なければ undefined)。getCellAt は、図の座標ではなく拡大後の画面座標(コンテナ内)で判定する */

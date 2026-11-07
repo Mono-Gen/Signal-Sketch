@@ -10,6 +10,7 @@ import { getTemplate } from './model/query';
 import { DocumentStore } from './state/store';
 import { createAppChrome } from './ui/appChrome';
 import { createClipboardCommands } from './ui/clipboardCommands';
+import { installContextMenu } from './ui/contextMenu';
 import { createCsvImport } from './ui/csvImportFlow';
 import { errorText } from './ui/errorText';
 import { createFileCommands } from './ui/fileCommands';
@@ -186,6 +187,7 @@ themeBtn.addEventListener('click', () => {
 const files = createFileCommands({ store, view, pageId: PAGE_ID, setStatus });
 const importCsv = createCsvImport({ store, pageId: PAGE_ID, apply, setStatus, selectItems: (nodeIds, frameIds) => view.selectItems(nodeIds, frameIds) });
 const clipboard = createClipboardCommands({ store, view, pageId: PAGE_ID, apply, setStatus });
+installContextMenu({ container: graphEl, view, store, pageId: PAGE_ID, apply, setStatus, clipboard });
 
 /** ボタンから選んだファイルを受け取る隠しの入力欄。同じファイルを続けて選んでも change が発火するよう、受け取ったら空にする */
 function wireFileInput(input: HTMLInputElement, onFile: (file: File) => void): void {

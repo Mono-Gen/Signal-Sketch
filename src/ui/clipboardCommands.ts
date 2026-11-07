@@ -18,6 +18,8 @@ export interface ClipboardCommandsDeps {
 export interface ClipboardCommands {
   copy(): void;
   paste(): void;
+  /** 貼り付ける内容があるか(右クリックメニューで、貼り付けの有効・無効を決める) */
+  canPaste(): boolean;
   /** その場で複製する(コピー内容は変えない) */
   duplicate(): void;
   deleteSelection(): void;
@@ -66,6 +68,7 @@ export function createClipboardCommands(deps: ClipboardCommandsDeps): ClipboardC
       pasteCount += 1;
       pasteData(clipboard, pasteCount);
     },
+    canPaste: () => clipboard !== null,
     duplicate() {
       const data = copyToClipboard();
       if (data) pasteData(data, 1);

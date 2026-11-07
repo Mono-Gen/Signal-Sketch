@@ -61,6 +61,15 @@ If the devices do not fit, you can enlarge the page (the drawing area). With not
 - With two or more devices selected, the right panel shows **Align / distribute** buttons. **Align left, Center horizontally, Align right, Align top, Center vertically, Align bottom** line the devices up with the rectangle that surrounds the whole selection. **Space evenly (horizontal / vertical)** needs three or more devices: the two outermost devices stay put and the gaps between devices are made equal. When grid snap is on, the resulting positions are rounded to the grid (centering and even spacing can be off by up to half a grid step). Frames are not moved. One Undo reverts the change.
 - Shift + drag on an empty spot selects **ports** instead of devices (see "Connect many ports at once").
 
+### Right-click menu
+
+Right-click on the diagram to open a menu with the actions available at that spot (the same actions as the shortcuts and the panel buttons).
+
+- **On a device, frame or line**: Copy, Duplicate, Delete. With two or more devices selected, Align and Space evenly are also shown (Space evenly needs three or more devices). Right-clicking something that is not selected selects just that item first; right-clicking something that is already selected (even among several) keeps the selection.
+- **On an empty spot**: Paste (when something has been copied) and Select all.
+- Close it with Esc, by clicking outside, or by scrolling or resizing the window. From the keyboard, use Up/Down/Home/End to choose an item and Enter to run it.
+- Over the panel, the toolbar and dialogs, the browser's own menu is left as it is.
+
 ### Copy and duplicate
 
 - Select devices or frames, then press **Ctrl+C** to copy and **Ctrl+V** to paste. **Ctrl+D** duplicates in place.

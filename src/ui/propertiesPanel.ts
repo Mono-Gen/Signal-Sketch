@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import type { MessageKey } from '../i18n';
 import type { Diagnostic } from '../model/diagnostics';
-import { applyNodeMoves, MIN_DISTRIBUTE_COUNT, planAlign, planDistribute } from '../model/align';
+import { MIN_DISTRIBUTE_COUNT, planAlign, planDistribute } from '../model/align';
 import type { AlignMode, DistributeAxis } from '../model/align';
 import { nodesInFrame, updateFrame } from '../model/frames';
 import { clearPortPlacements, lostEdgeIds, lostEdgeIdsForCount, setPageSize, setPortGroups, updateNode } from '../model/actions';
@@ -12,6 +12,7 @@ import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
 import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
+import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 
 export interface PanelContext {
@@ -129,13 +130,7 @@ export class PropertiesPanel {
 
   /** 選んだ機器の揃え・等間隔。動く機器がなければ何も適用せず(履歴を積まず)、その旨を知らせる */
   private alignSection(ids: readonly string[]): HTMLElement {
-    const run = (moves: ReturnType<typeof planAlign>): void => {
-      if (moves.length === 0) {
-        this.ctx.setStatus('info', t('status.alignNothing'));
-        return;
-      }
-      if (this.ctx.apply(applyNodeMoves(this.ctx.pageId, moves)).ok) this.ctx.setStatus('ok', t('status.aligned', { count: moves.length }));
-    };
+    const run = (moves: ReturnType<typeof planAlign>): void => applyAlignPlan(moves, this.ctx);
     const button = (text: string, action: string, disabled: boolean, onClick: () => void) =>
       el('button', {
         text,
