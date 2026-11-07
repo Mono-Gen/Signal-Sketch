@@ -3,7 +3,7 @@ import { parseDocument, serializeDocument } from '../../src/io/fileIo';
 import { buildSvg } from '../../src/io/svgExport';
 import { addNodeFromTemplate, removeItems } from '../../src/model/actions';
 import { createEmptyDocument } from '../../src/model/defaults';
-import { clearNodeImage, resizeNode, resizeNodeRect, setNodeImage, usedAssets } from '../../src/model/imageActions';
+import { clearNodeImage, clearNodesImage, resizeNode, resizeNodeRect, setNodeImage, setNodesImage, usedAssets } from '../../src/model/imageActions';
 import { copySelection, pasteClipboard } from '../../src/model/clipboard';
 import { MAX_IMAGES_PER_DOCUMENT } from '../../src/model/images';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
@@ -281,6 +281,67 @@ describe('setNodeImage / clearNodeImage', () => {
     expect(store.doc.pages[0].nodes[0].imageId).toBeUndefined();
     expect(store.doc.pages[0].nodes[0].h).toBe(h);
     expect(store.doc.assets['img-a']).toBeUndefined();
+  });
+});
+
+describe('setNodesImage / clearNodesImage(複数の機器へまとめて)', () => {
+  it('選んだ機器すべてに同じ画像を設定する。assets は1つで、機器ごとに幅はそのまま・高さが画像に合う', () => {
+    const doc = createEmptyDocument();
+    doc.grid.enabled = false;
+    const a = put(doc, 'speaker', 40, 40, 160, 60);
+    const b = put(doc, 'speaker', 300, 40, 240, 60); // 幅が違う
+    expect(setNodesImage(P, [a, b], image('img-a', 640, 640, pngUri(640, 640)))(doc).ok).toBe(true);
+    expect(Object.keys(doc.assets)).toEqual(['img-a']);
+    expect(node(doc, a).imageId).toBe('img-a');
+    expect(node(doc, b).imageId).toBe('img-a');
+    expect([node(doc, a).w, node(doc, a).h]).toEqual([160, 184]); // 32 + 144 + 8
+    expect([node(doc, b).w, node(doc, b).h]).toEqual([240, 264]); // 32 + 224 + 8 (幅は機器ごとにそのまま)
+  });
+
+  it('すでに別の画像がある機器・種類の違う機器が混ざっていても、すべて上書きして設定する', () => {
+    const doc = createEmptyDocument();
+    const a = put(doc, 'speaker', 40, 40);
+    const b = put(doc, 'camera', 300, 40);
+    setNodeImage(P, a, image('img-old'))(doc);
+    setNodesImage(P, [a, b], image('img-new', 10, 10, pngUri(10, 10)))(doc);
+    expect(node(doc, a).imageId).toBe('img-new');
+    expect(node(doc, b).imageId).toBe('img-new');
+  });
+
+  it('重複した ID は1台として扱う。空の指定・存在しない機器は断り、何も変えない', () => {
+    const doc = createEmptyDocument();
+    const a = put(doc, 'speaker', 40, 40);
+    expect(setNodesImage(P, [a, a], image('img-a'))(doc).ok).toBe(true);
+    const before = structuredClone(doc);
+    expect(setNodesImage(P, [], image('img-b'))(doc)).toMatchObject({ ok: false, error: 'unknown-node' });
+    // 2台目が存在しない: ストアが失敗した操作を捨てる(アクション単体では、1台目まで変わっているので、ストア経由で確認)
+    const store = new DocumentStore(before);
+    expect(store.apply(setNodesImage(P, [a, 'nope'], image('img-b')))).toMatchObject({ ok: false, error: 'unknown-node' });
+    expect(store.doc).toEqual(before);
+  });
+
+  it('元に戻すは1回で、全員の画像と大きさが戻る(ストア経由)', () => {
+    const store = new DocumentStore(createEmptyDocument());
+    store.apply(addNodeFromTemplate(P, tpl('speaker'), 'A', { x: 40, y: 40 }));
+    store.apply(addNodeFromTemplate(P, tpl('speaker'), 'B', { x: 300, y: 40 }));
+    const ids = store.doc.pages[0].nodes.map((n) => n.id);
+    const heights = store.doc.pages[0].nodes.map((n) => n.h);
+    store.apply(setNodesImage(P, ids, image('img-a', 10, 10, pngUri(10, 10))));
+    expect(store.doc.pages[0].nodes.every((n) => n.imageId === 'img-a')).toBe(true);
+    store.undo();
+    expect(store.doc.pages[0].nodes.every((n) => n.imageId === undefined)).toBe(true);
+    expect(store.doc.pages[0].nodes.map((n) => n.h)).toEqual(heights);
+  });
+
+  it('まとめて外す: 画像のない機器が混ざっていても通る。全員の imageId が消える', () => {
+    const doc = createEmptyDocument();
+    const a = put(doc, 'speaker', 40, 40);
+    const b = put(doc, 'speaker', 300, 40);
+    setNodeImage(P, a, image('img-a'))(doc); // b は画像なし
+    expect(clearNodesImage(P, [a, b])(doc).ok).toBe(true);
+    expect(node(doc, a).imageId).toBeUndefined();
+    expect(node(doc, b).imageId).toBeUndefined();
+    expect(clearNodesImage(P, [])(doc)).toMatchObject({ ok: false, error: 'unknown-node' });
   });
 });
 

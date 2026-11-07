@@ -135,6 +135,35 @@ export function clearNodeImage(pageId: string, nodeId: string): Action {
   };
 }
 
+/**
+ * 複数の機器へ、同じ画像をまとめて設定する。機器ごとに、幅はそのままで高さを画像に合わせる(setNodeImage と同じ)。
+ * すでに別の画像がある機器は上書きする。1台でも失敗したら、全体を適用しない(ストアは失敗した操作を捨てる)。
+ */
+export function setNodesImage(pageId: string, nodeIds: readonly string[], image: NodeImage): Action {
+  return (doc) => {
+    const ids = [...new Set(nodeIds)];
+    if (ids.length === 0) return fail('unknown-node');
+    for (const id of ids) {
+      const r = setNodeImage(pageId, id, image)(doc);
+      if (!r.ok) return r;
+    }
+    return OK;
+  };
+}
+
+/** 複数の機器から、画像をまとめて外す。画像のない機器が混ざっていてもよい(そのまま通す) */
+export function clearNodesImage(pageId: string, nodeIds: readonly string[]): Action {
+  return (doc) => {
+    const ids = [...new Set(nodeIds)];
+    if (ids.length === 0) return fail('unknown-node');
+    for (const id of ids) {
+      const r = clearNodeImage(pageId, id)(doc);
+      if (!r.ok) return r;
+    }
+    return OK;
+  };
+}
+
 /** どの機器からも使われていない画像を除いた assets を返す(保存のとき。元の doc は変えない) */
 export function usedAssets(doc: Pick<DiagramDocument, 'assets' | 'pages'>): Record<string, string> {
   const used = new Set<string>();

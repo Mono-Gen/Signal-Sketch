@@ -84,6 +84,7 @@ Right-click on the diagram to open a menu with the actions available at that spo
 - **Choose image…** sets your own image on a device (PNG, JPEG or WebP, up to 5 MB and 40 million pixels for the original file). It is shown **keeping its aspect ratio** in the area below the name line. Right after you set it, the device keeps its width and its height grows to fit the image. You can change the width and height afterwards. **Remove image** brings back the small icon.
 - On import the image is shrunk to at most 640 px on its longest side and stored inside the diagram file (the original is not kept; handing over the diagram file hands over the images too). Images that are no longer used are dropped when you save. One diagram can hold up to 50 images, 5 MB in total.
 - A JPEG cannot be transparent, so its white background stays. **For dark mode, a PNG with a transparent background works best.** SVG images are not supported.
+- **You can also set an image while several devices are selected** (the "Image" section in the right panel). The same image goes on every selected device (different types are fine and an existing image is replaced; frames are not affected), and each device keeps its width while its height grows to fit the image. "Remove image" also applies to every selected device. One Undo reverts it.
 - Copying or duplicating a device shares the same image. SVG and PNG exports include the images.
 - Rights to the images (copyright, trademarks and so on) are your responsibility.
 

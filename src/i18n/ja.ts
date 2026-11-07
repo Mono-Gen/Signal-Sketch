@@ -168,6 +168,7 @@ const ja = {
   'props.imageRemove': '画像を外す',
   'props.imageHint': 'PNG・JPEG・WebP(5MBまで)。取り込むときに縮小します。ダークモードで使うなら、透過PNGがおすすめです',
   'status.imageSet': '画像を設定しました',
+  'status.imageSetMany': '{count}台に画像を設定しました',
   'status.imageRemoved': '画像を外しました',
   'error.image.unsupported-type': '画像を設定できません: PNG・JPEG・WebP のファイルを選んでください',
   'error.image.file-too-large': '画像を設定できません: ファイルが大きすぎます(5MBまで)',

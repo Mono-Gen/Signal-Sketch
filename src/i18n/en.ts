@@ -160,6 +160,7 @@ const en: Record<MessageKey, string> = {
   'props.imageRemove': 'Remove image',
   'props.imageHint': 'PNG, JPEG or WebP (up to 5 MB). It is shrunk when imported. For dark mode, a transparent PNG works best',
   'status.imageSet': 'Image set',
+  'status.imageSetMany': 'Set the image on {count} devices',
   'status.imageRemoved': 'Image removed',
   'error.image.unsupported-type': 'Cannot set the image: choose a PNG, JPEG or WebP file',
   'error.image.file-too-large': 'Cannot set the image: the file is too large (up to 5 MB)',

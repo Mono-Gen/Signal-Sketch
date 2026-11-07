@@ -13,7 +13,7 @@ import { resolvePortGroups } from '../model/ports';
 import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
-import { clearNodeImage, resizeNode, setNodeImage } from '../model/imageActions';
+import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 
@@ -125,7 +125,7 @@ export class PropertiesPanel {
     const node = nodeId ? getPage(doc, this.ctx.pageId)?.nodes.find((n) => n.id === nodeId) : undefined;
     if (!node) {
       this.root.append(el('p', { className: 'hint', text: emptyHint }));
-      if (alignIds.length >= 2) this.root.append(this.alignSection(alignIds));
+      if (alignIds.length >= 2) this.root.append(this.alignSection(alignIds), this.imageSection(alignIds));
       this.root.append(this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
       return;
     }
@@ -356,7 +356,7 @@ export class PropertiesPanel {
       field(t('props.count'), count),
       ...(node.count && node.count > 1 ? [el('p', { className: 'hint', text: t('props.unitPortsHint') })] : []),
       this.sizeFields(node),
-      this.imageSection(node),
+      this.imageSection([node.id]),
     ]);
   }
 
@@ -379,8 +379,13 @@ export class PropertiesPanel {
     return el('div', { className: 'size-row' }, [field(t('props.width'), input('w', 'width')), field(t('props.height'), input('h', 'height'))]);
   }
 
-  /** 機器の画像。ファイルを選ぶと、縮小・再符号化して図に入れる。外すと、小さなアイコンに戻る */
-  private imageSection(node: DiagramNode): HTMLElement {
+  /**
+   * 機器の画像。ファイルを選ぶと、縮小・再符号化して図に入れる。外すと、小さなアイコンに戻る。
+   * 複数の機器を選んでいるときは、選んだ機器すべてに(縮小・再符号化は1回だけ行い、同じ画像を共有する)。
+   */
+  private imageSection(nodeIds: readonly string[]): HTMLElement {
+    const page = getPage(this.ctx.getDoc(), this.ctx.pageId);
+    const anyImage = nodeIds.some((id) => page?.nodes.find((n) => n.id === id)?.imageId);
     const file = el('input', {
       attrs: { type: 'file', accept: 'image/png,image/jpeg,image/webp', 'data-prop': 'image-file', hidden: '', tabindex: '-1' },
       on: {
@@ -388,17 +393,17 @@ export class PropertiesPanel {
           const input = ev.target as HTMLInputElement;
           const picked = input.files?.[0];
           input.value = ''; // 同じファイルを続けて選んでも change が発火するよう、空に戻す
-          if (picked) void this.setImage(node.id, picked);
+          if (picked) void this.setImage(nodeIds, picked);
         },
       },
     });
     const choose = el('button', { text: t('props.imageChoose'), attrs: { type: 'button', 'data-action': 'image-choose' }, on: { click: () => file.click() } });
     const remove = el('button', {
       text: t('props.imageRemove'),
-      attrs: { type: 'button', 'data-action': 'image-remove', ...(node.imageId ? {} : { disabled: '' }) },
+      attrs: { type: 'button', 'data-action': 'image-remove', ...(anyImage ? {} : { disabled: '' }) },
       on: {
         click: () => {
-          if (this.ctx.apply(clearNodeImage(this.ctx.pageId, node.id)).ok) this.ctx.setStatus('ok', t('status.imageRemoved'));
+          if (this.ctx.apply(clearNodesImage(this.ctx.pageId, nodeIds)).ok) this.ctx.setStatus('ok', t('status.imageRemoved'));
         },
       },
     });
@@ -412,7 +417,7 @@ export class PropertiesPanel {
   /** いちばん新しい画像の取り込みの番号。古い取り込みが、あとから完了しても、結果を捨てるために使う */
   private imageRequest = 0;
 
-  private async setImage(nodeId: string, file: File): Promise<void> {
+  private async setImage(nodeIds: readonly string[], file: File): Promise<void> {
     const request = ++this.imageRequest;
     const epoch = this.ctx.getEpoch();
     const prepared = await prepareImage(file);
@@ -422,7 +427,9 @@ export class PropertiesPanel {
       this.ctx.setStatus('error', t(`error.image.${prepared.error}` as MessageKey));
       return;
     }
-    if (this.ctx.apply(setNodeImage(this.ctx.pageId, nodeId, prepared.image)).ok) this.ctx.setStatus('ok', t('status.imageSet'));
+    if (this.ctx.apply(setNodesImage(this.ctx.pageId, nodeIds, prepared.image)).ok) {
+      this.ctx.setStatus('ok', nodeIds.length > 1 ? t('status.imageSetMany', { count: nodeIds.length }) : t('status.imageSet'));
+    }
   }
 
   private portSection(doc: DiagramDocument, node: DiagramNode): HTMLElement {
