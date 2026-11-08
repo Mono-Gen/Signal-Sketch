@@ -8,6 +8,7 @@ import { exceedsPortLimit, expandPortGroups, expandUnits } from './ports';
 import { alongRange } from './portLayout';
 import { isValidPageSize, itemsOutside } from './pageSize';
 import { getNodePorts, getPage, getTemplate, layoutNodePorts } from './query';
+import { MAX_TEMPLATES } from './templateActions';
 import type { DeviceTemplate, DiagramDocument, DiagramNode, PortGroup, PortRef, Side } from './types';
 
 /** 失敗理由のコード。文言は画面側(i18n)で決める(モデルは言語を持たない) */
@@ -26,6 +27,8 @@ export type ActionError =
   | 'unknown-frame'
   | 'unknown-signal'
   | 'signal-in-use'
+  | 'template-in-use'
+  | 'too-many-templates'
   | 'page-too-small'
   | 'import-no-space'
   | 'document-too-large';
@@ -54,6 +57,38 @@ export type Action = (doc: DiagramDocument) => ActionResult;
 
 const fail = (error: ActionError): ActionResult => ({ ok: false, error });
 const OK: ActionResult = { ok: true };
+
+/** 登録サイズを尊重しつつ、ページ内かつポートを表示できる最小サイズへ収める。 */
+function templatePlacementSize(
+  doc: DiagramDocument,
+  pageSize: { w: number; h: number },
+  template: DeviceTemplate,
+  label: string,
+): { w: number; h: number } | null {
+  const minimum = autoNodeSize({ groups: template.portGroups, label, model: '', grid: doc.grid.size });
+  if (minimum.w > pageSize.w || minimum.h > pageSize.h) return null;
+  const preferred = template.size ?? minimum;
+  return {
+    w: Math.min(Math.max(preferred.w, minimum.w), pageSize.w),
+    h: Math.min(Math.max(preferred.h, minimum.h), pageSize.h),
+  };
+}
+
+function fitNodePosition(
+  doc: DiagramDocument,
+  at: { x: number; y: number },
+  size: { w: number; h: number },
+  pageSize: { w: number; h: number },
+): { x: number; y: number } {
+  const placed = {
+    x: doc.grid.enabled ? snap(at.x, doc.grid.size) : at.x,
+    y: doc.grid.enabled ? snap(at.y, doc.grid.size) : at.y,
+  };
+  return {
+    x: Math.min(Math.max(placed.x, 0), pageSize.w - size.w),
+    y: Math.min(Math.max(placed.y, 0), pageSize.h - size.h),
+  };
+}
 
 /** 機器をまとめて移動する。グリッドが有効なら吸着する */
 export function moveNodes(pageId: string, moves: readonly { id: string; x: number; y: number }[]): Action {
@@ -126,7 +161,8 @@ export function addEdges(pageId: string, pairs: readonly { from: PortRef; to: Po
 /**
  * テンプレートから機器を1台追加する。テンプレートが図にまだ無ければ(標準機器など)、
  * 図へ取り込む。すでに同じIDがあれば取り込み済みのものを使い、上書きしない。
- * 位置を省略すると空いている場所へ置く。大きさはポートと名称に合わせて自動で決める。
+ * 位置を省略すると空いている場所へ置く。登録済みの大きさ・画像があれば引き継ぎ、
+ * 無い標準機器は従来どおりポートと名称に合わせた自動サイズを使う。
  */
 export function addNodeFromTemplate(
   pageId: string,
@@ -139,16 +175,28 @@ export function addNodeFromTemplate(
     if (!page) return fail('unknown-page');
     let tpl = doc.deviceTemplates.find((t) => t.id === template.id);
     if (!tpl) {
+      if (doc.deviceTemplates.length >= MAX_TEMPLATES) return fail('too-many-templates');
       tpl = structuredClone(template);
       doc.deviceTemplates.push(tpl);
     }
     ensureSignalTypes(doc, tpl.portGroups);
-    const size = autoNodeSize({ groups: tpl.portGroups, label, model: '', grid: doc.grid.size });
+    const size = templatePlacementSize(doc, page.size, tpl, label);
+    if (!size) return { ok: false, error: 'import-no-space', blockers: [label] };
     const pos = at
-      ? { x: doc.grid.enabled ? snap(at.x, doc.grid.size) : at.x, y: doc.grid.enabled ? snap(at.y, doc.grid.size) : at.y }
+      ? fitNodePosition(doc, at, size, page.size)
       : findFreePosition(page.nodes, size, page.size, doc.grid.size);
     const id = uniqueId('n', page.nodes.map((n) => n.id));
-    page.nodes.push({ id, templateId: tpl.id, label, model: '', x: pos.x, y: pos.y, w: size.w, h: size.h });
+    page.nodes.push({
+      id,
+      templateId: tpl.id,
+      label,
+      model: '',
+      x: pos.x,
+      y: pos.y,
+      w: size.w,
+      h: size.h,
+      ...(tpl.imageId ? { imageId: tpl.imageId } : {}),
+    });
     return { ok: true, created: id };
   };
 }
@@ -186,11 +234,13 @@ export function addNodesInRow(
 
     let tpl = doc.deviceTemplates.find((t) => t.id === template.id);
     if (!tpl) {
+      if (doc.deviceTemplates.length >= MAX_TEMPLATES) return fail('too-many-templates');
       tpl = structuredClone(template);
       doc.deviceTemplates.push(tpl);
     }
     ensureSignalTypes(doc, tpl.portGroups);
-    const size = autoNodeSize({ groups: tpl.portGroups, label, model: '', grid: doc.grid.size });
+    const size = templatePlacementSize(doc, page.size, tpl, label);
+    if (!size) return { ok: false, error: 'import-no-space', blockers: [label] };
 
     const g = doc.grid.size;
     const gridOn = doc.grid.enabled;
@@ -227,6 +277,7 @@ export function addNodesInRow(
         y: horizontal ? startY : startY + i * step,
         w: size.w,
         h: size.h,
+        ...(tpl.imageId ? { imageId: tpl.imageId } : {}),
       });
     }
     return { ok: true, created: created[0], createdNodeIds: created };

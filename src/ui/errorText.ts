@@ -2,6 +2,7 @@ import { t } from '../i18n';
 import type { MessageKey } from '../i18n';
 import type { ActionResult } from '../model/actions';
 import { MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from '../model/docLimits';
+import { MAX_TEMPLATES } from '../model/templateActions';
 
 /** 失敗理由のコード → 文言の辞書キー。モデルは言語を持たないので、文言はここで決める */
 const ERROR_KEY: Record<NonNullable<ActionResult['error']>, MessageKey> = {
@@ -19,6 +20,8 @@ const ERROR_KEY: Record<NonNullable<ActionResult['error']>, MessageKey> = {
   'unknown-frame': 'error.unknownFrame',
   'unknown-signal': 'error.unknownSignal',
   'signal-in-use': 'error.signalInUse',
+  'template-in-use': 'error.templateInUse',
+  'too-many-templates': 'error.tooManyTemplates',
   'page-too-small': 'error.pageTooSmall',
   'import-no-space': 'error.importNoSpace',
   'document-too-large': 'error.documentTooLarge',
@@ -40,5 +43,6 @@ export function errorText(r: ActionResult): string {
   if (r.error === 'document-too-large') {
     return t('error.documentTooLarge', { nodes: MAX_NODES_PER_PAGE, ports: MAX_PORTS_PER_PAGE, edges: MAX_EDGES_PER_PAGE });
   }
+  if (r.error === 'too-many-templates') return t('error.tooManyTemplates', { max: MAX_TEMPLATES });
   return t(ERROR_KEY[r.error!]);
 }

@@ -1,7 +1,9 @@
 import type { Action, ActionResult } from './actions';
+import { assetsIssue } from './images';
 import { snap } from './grid';
 import { uniqueId } from './ids';
 import { getPage } from './query';
+import { isCustomTemplateId, MAX_TEMPLATES } from './templateActions';
 import type { DeviceTemplate, DiagramDocument, DiagramEdge, DiagramGroup, DiagramNode, SignalType } from './types';
 
 // コピー&貼り付け。選んだ機器・枠を、アプリのデータとして複製する。
@@ -15,6 +17,7 @@ export interface ClipboardData {
   edges: DiagramEdge[];
   templates: DeviceTemplate[];
   signalTypes: SignalType[];
+  assets: Record<string, string>;
 }
 
 /** 貼り付けの1回ごとのずらし量(グリッド2つぶん) */
@@ -65,7 +68,53 @@ export function copySelection(
   for (const n of nodes) for (const g of n.portGroupsOverride ?? []) usedSignals.add(g.signalType);
   const signalTypes = doc.signalTypes.filter((s) => usedSignals.has(s.id));
 
-  return structuredClone({ nodes, frames, edges, templates, signalTypes });
+  const assetIds = new Set<string>();
+  for (const node of nodes) if (node.imageId) assetIds.add(node.imageId);
+  for (const template of templates) if (template.imageId) assetIds.add(template.imageId);
+  const assets = Object.fromEntries(
+    [...assetIds].filter((id) => doc.assets?.[id] !== undefined).map((id) => [id, doc.assets![id]]),
+  );
+
+  return structuredClone({ nodes, frames, edges, templates, signalTypes, assets });
+}
+
+function sameSize(a: DeviceTemplate['size'], b: DeviceTemplate['size']): boolean {
+  if (!a || !b) return a === b;
+  return a.w === b.w && a.h === b.h;
+}
+
+function samePortGroups(a: DeviceTemplate['portGroups'], b: DeviceTemplate['portGroups']): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((group, index) => {
+    const other = b[index];
+    return (
+      group.id === other.id &&
+      group.signalType === other.signalType &&
+      group.direction === other.direction &&
+      group.side === other.side &&
+      group.count === other.count &&
+      group.labelPrefix === other.labelPrefix &&
+      group.multi === other.multi
+    );
+  });
+}
+
+/** 別の図の定義を安全に再利用できるか、配置に影響する全項目で比較する。 */
+function sameTemplate(a: DeviceTemplate, b: DeviceTemplate): boolean {
+  return (
+    a.name === b.name &&
+    a.kind === b.kind &&
+    a.shape === b.shape &&
+    a.imageId === b.imageId &&
+    sameSize(a.size, b.size) &&
+    samePortGroups(a.portGroups, b.portGroups)
+  );
+}
+
+function importedTemplatePrefix(templateId: string): string {
+  if (isCustomTemplateId(templateId)) return 'custom';
+  // preset-* は組み込み定義と誤認されないIDへ退避する。
+  return 'imported';
 }
 
 /** 余白 margin を含めて、2つの矩形が重なるか(辺が接するだけなら重ならない) */
@@ -136,6 +185,55 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     if (!page) return { ok: false, error: 'unknown-page' };
     if (data.nodes.length === 0 && data.frames.length === 0) return { ok: false, error: 'invalid-value' };
 
+    const referencedAssetIds = new Set<string>();
+    for (const node of data.nodes) if (node.imageId) referencedAssetIds.add(node.imageId);
+    for (const template of data.templates) if (template.imageId) referencedAssetIds.add(template.imageId);
+    for (const assetId of referencedAssetIds) {
+      if (data.assets[assetId] === undefined && doc.assets?.[assetId] === undefined) {
+        return { ok: false, error: 'invalid-value' };
+      }
+    }
+    for (const [assetId, dataUri] of Object.entries(data.assets)) {
+      const existing = doc.assets?.[assetId];
+      if (existing !== undefined && existing !== dataUri) return { ok: false, error: 'invalid-value' };
+    }
+    // 履歴間で assets が参照共有されるため、貼り付け前のオブジェクトは一切変更しない。
+    const nextAssets = { ...doc.assets, ...data.assets };
+    if (assetsIssue(nextAssets)) return { ok: false, error: 'document-too-large' };
+
+    const templateIdMap = new Map<string, string>();
+    const importedTemplates: DeviceTemplate[] = [];
+    const resolvedTemplates = [...doc.deviceTemplates];
+    for (const template of data.templates) {
+      const existing = resolvedTemplates.find((candidate) => candidate.id === template.id);
+      if (!existing) {
+        const imported = structuredClone(template);
+        importedTemplates.push(imported);
+        resolvedTemplates.push(imported);
+        templateIdMap.set(template.id, template.id);
+        continue;
+      }
+      if (sameTemplate(existing, template)) {
+        templateIdMap.set(template.id, existing.id);
+        continue;
+      }
+
+      const id = uniqueId(
+        importedTemplatePrefix(template.id),
+        resolvedTemplates.map((candidate) => candidate.id),
+      );
+      const imported = { ...structuredClone(template), id };
+      importedTemplates.push(imported);
+      resolvedTemplates.push(imported);
+      templateIdMap.set(template.id, id);
+    }
+    for (const node of data.nodes) {
+      if (!templateIdMap.has(node.templateId)) return { ok: false, error: 'invalid-value' };
+    }
+    if (doc.deviceTemplates.length + importedTemplates.length > MAX_TEMPLATES) {
+      return { ok: false, error: 'too-many-templates' };
+    }
+
     const g = doc.grid.size;
     const s = (v: number) => (doc.grid.enabled ? snap(v, g) : v);
     // ページの外へ出ないよう、全体の外接矩形が収まる範囲へ、ずらし量を丸める
@@ -151,16 +249,21 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     for (const st of data.signalTypes) {
       if (!doc.signalTypes.some((x) => x.id === st.id)) doc.signalTypes.push(structuredClone(st));
     }
-    for (const t of data.templates) {
-      if (!doc.deviceTemplates.some((x) => x.id === t.id)) doc.deviceTemplates.push(structuredClone(t));
-    }
+    doc.deviceTemplates.push(...importedTemplates);
+    doc.assets = nextAssets;
 
     const nodeIdMap = new Map<string, string>();
     const createdNodeIds: string[] = [];
     for (const n of structuredClone(data.nodes)) {
       const id = uniqueId('n', page.nodes.map((x) => x.id));
       nodeIdMap.set(n.id, id);
-      page.nodes.push({ ...n, id, x: n.x + dx, y: n.y + dy });
+      page.nodes.push({
+        ...n,
+        id,
+        templateId: templateIdMap.get(n.templateId)!,
+        x: n.x + dx,
+        y: n.y + dy,
+      });
       createdNodeIds.push(id);
     }
     const createdFrameIds: string[] = [];

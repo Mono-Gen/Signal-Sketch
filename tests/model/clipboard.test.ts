@@ -8,12 +8,34 @@ import { movePort } from '../../src/model/actions';
 import { validateDocument } from '../../src/model/validate';
 import { DocumentStore } from '../../src/state/store';
 import { createSampleDocument } from '../fixtures/sampleDocument';
+import { parseDocument, serializeDocument } from '../../src/io/fileIo';
+import { MAX_TEMPLATES } from '../../src/model/templateActions';
+import type { DeviceTemplate } from '../../src/model/types';
+import { TINY_PNG } from '../fixtures/tinyImage';
 
 const P = 'page-1';
 const fresh = () => createSampleDocument();
 const node = (doc: ReturnType<typeof fresh>, id: string) => doc.pages[0].nodes.find((n) => n.id === id)!;
 const paste = (doc: ReturnType<typeof fresh>, data: NonNullable<ReturnType<typeof copySelection>>, d = 20) =>
   pasteClipboard(P, data, { dx: d, dy: d })(doc);
+
+const customTemplate = (overrides: Partial<DeviceTemplate> = {}): DeviceTemplate => ({
+  ...presetToTemplate(PRESETS.find((p) => p.id === 'speaker')!, '登録スピーカー'),
+  id: 'custom-1',
+  size: { w: 240, h: 160 },
+  imageId: 'img-source',
+  ...overrides,
+});
+
+const addCustomNode = (doc: ReturnType<typeof createEmptyDocument>, template = customTemplate()) => {
+  doc.assets['img-source'] = TINY_PNG;
+  return addNodeFromTemplate(P, template, '登録機器', { x: 40, y: 40 })(doc).created!;
+};
+
+const tinyPngVariant = (marker: number): string => {
+  const bytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, marker];
+  return `data:image/png;base64,${btoa(String.fromCharCode(...bytes))}`;
+};
 
 describe('copySelection', () => {
   it('何も選ばれていない・存在しないページは null', () => {
@@ -50,6 +72,16 @@ describe('copySelection', () => {
     const data = copySelection(doc, P, { nodeIds: ['sw'] })!;
     updateNode(P, 'sw', { label: '変更後' })(doc);
     expect(data.nodes[0].label).toBe('Network Switch');
+  });
+
+  it('機器画像と登録テンプレート画像が別なら、両方の画像データを含める', () => {
+    const doc = createEmptyDocument();
+    const id = addCustomNode(doc);
+    doc.assets['img-node'] = tinyPngVariant(2);
+    doc.pages[0].nodes.find((candidate) => candidate.id === id)!.imageId = 'img-node';
+
+    const data = copySelection(doc, P, { nodeIds: [id] })!;
+    expect(data.assets).toEqual({ 'img-node': tinyPngVariant(2), 'img-source': TINY_PNG });
   });
 });
 
@@ -189,19 +221,145 @@ describe('pasteClipboard', () => {
     expect(validateDocument(JSON.parse(JSON.stringify(dst))).ok).toBe(true);
   });
 
-  it('図にすでにある機器の種類・信号の種類は、上書きしない', () => {
+  it('同じIDで内容が異なる機器の種類は上書きせず、貼り付け側を別IDへ移す', () => {
     const doc = fresh();
     const data = copySelection(doc, P, { nodeIds: ['sw'] })!;
     doc.signalTypes[0].color = '#123456';
-    doc.deviceTemplates.find((t) => t.id === node(doc, 'sw').templateId)!.name = '編集済み';
-    paste(doc, data);
+    const originalId = node(doc, 'sw').templateId;
+    doc.deviceTemplates.find((t) => t.id === originalId)!.name = '編集済み';
+    const result = paste(doc, data);
     expect(doc.signalTypes[0].color).toBe('#123456');
-    expect(doc.deviceTemplates.find((t) => t.id === node(doc, 'sw').templateId)!.name).toBe('編集済み');
+    expect(doc.deviceTemplates.find((t) => t.id === originalId)!.name).toBe('編集済み');
+    expect(node(doc, result.createdNodeIds![0]).templateId).not.toBe(originalId);
+  });
+
+  it('新規の図へ画像付き機器を貼ると画像も移り、保存して開き直せる', () => {
+    const source = createEmptyDocument();
+    const sourceNodeId = addCustomNode(source);
+    const store = new DocumentStore(source);
+    const data = copySelection(store.doc, P, { nodeIds: [sourceNodeId] })!;
+    expect(data.assets).toEqual({ 'img-source': TINY_PNG });
+
+    store.replace(createEmptyDocument());
+    const previousAssets = store.doc.assets;
+    const result = store.apply(pasteClipboard(P, data, { dx: 20, dy: 20 }));
+    expect(result.ok).toBe(true);
+    const pasted = store.doc.pages[0].nodes.find((candidate) => candidate.id === result.createdNodeIds![0])!;
+    expect(pasted.imageId).toBe('img-source');
+    expect(store.doc.assets[pasted.imageId!]).toBe(TINY_PNG);
+    expect(store.doc.assets).not.toBe(previousAssets);
+    expect(previousAssets).toEqual({});
+    expect(validateDocument(store.doc).ok).toBe(true);
+    const parsed = parseDocument(serializeDocument(store.doc));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.doc.assets['img-source']).toBe(TINY_PNG);
+  });
+
+  it('異なる custom-1 がある図では登録機器を新IDへ移し、元定義と画像・寸法・ポートを保つ', () => {
+    const source = createEmptyDocument();
+    const sourceTemplate = customTemplate({
+      portGroups: [
+        { id: 'source-out', signalType: 'audio', direction: 'out', side: 'right', count: 2, labelPrefix: 'OUT' },
+      ],
+    });
+    const sourceNodeId = addCustomNode(source, sourceTemplate);
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+
+    const destination = createEmptyDocument();
+    const destinationTemplate = customTemplate({
+      name: '宛先の custom-1',
+      imageId: undefined,
+      size: { w: 100, h: 80 },
+      portGroups: [{ id: 'dest-in', signalType: 'audio', direction: 'in', side: 'left', count: 1, labelPrefix: 'IN' }],
+    });
+    destination.deviceTemplates.push(structuredClone(destinationTemplate));
+    const result = pasteClipboard(P, data, { dx: 0, dy: 0 })(destination);
+
+    expect(result.ok).toBe(true);
+    expect(destination.deviceTemplates.find((template) => template.id === 'custom-1')).toEqual(destinationTemplate);
+    const pastedNode = destination.pages[0].nodes.find((candidate) => candidate.id === result.createdNodeIds![0])!;
+    expect(pastedNode.templateId).toBe('custom-2');
+    expect(destination.deviceTemplates.find((template) => template.id === 'custom-2')).toMatchObject({
+      name: sourceTemplate.name,
+      size: sourceTemplate.size,
+      imageId: sourceTemplate.imageId,
+      portGroups: sourceTemplate.portGroups,
+    });
+    expect(destination.assets['img-source']).toBe(TINY_PNG);
+  });
+
+  it('同一内容の custom-1 は再利用し、登録を重複させない', () => {
+    const source = createEmptyDocument();
+    const template = customTemplate();
+    const sourceNodeId = addCustomNode(source, template);
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+    const destination = createEmptyDocument();
+    destination.deviceTemplates.push(structuredClone(template));
+
+    const result = pasteClipboard(P, data, { dx: 0, dy: 0 })(destination);
+    expect(result.ok).toBe(true);
+    expect(destination.deviceTemplates.filter((candidate) => candidate.id === 'custom-1')).toHaveLength(1);
+    expect(destination.deviceTemplates).toHaveLength(1);
+    expect(destination.pages[0].nodes[0].templateId).toBe('custom-1');
+  });
+
+  it('内容が異なる preset-* の衝突は、組み込み定義でない新IDへ移す', () => {
+    const source = createEmptyDocument();
+    const sourceTemplate = customTemplate({ id: 'preset-speaker', imageId: undefined, size: undefined });
+    const sourceNodeId = addNodeFromTemplate(P, sourceTemplate, 'コピー元', { x: 0, y: 0 })(source).created!;
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+    const destination = createEmptyDocument();
+    destination.deviceTemplates.push({ ...structuredClone(sourceTemplate), name: '宛先の別定義' });
+
+    const result = pasteClipboard(P, data, { dx: 0, dy: 0 })(destination);
+    expect(result.ok).toBe(true);
+    const pasted = destination.pages[0].nodes.find((candidate) => candidate.id === result.createdNodeIds![0])!;
+    expect(pasted.templateId).toBe('imported-1');
+    expect(pasted.templateId.startsWith('preset-')).toBe(false);
+    expect(destination.deviceTemplates.find((candidate) => candidate.id === 'preset-speaker')!.name).toBe('宛先の別定義');
+  });
+
+  it('貼り付けでテンプレート上限を超える場合は断る', () => {
+    const source = createEmptyDocument();
+    const sourceNodeId = addCustomNode(source, customTemplate({ id: 'custom-source' }));
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+    const destination = createEmptyDocument();
+    const base = customTemplate({ imageId: undefined, size: undefined });
+    destination.deviceTemplates = Array.from({ length: MAX_TEMPLATES }, (_, index) => ({ ...structuredClone(base), id: `existing-${index + 1}` }));
+
+    expect(pasteClipboard(P, data, { dx: 0, dy: 0 })(destination)).toEqual({ ok: false, error: 'too-many-templates' });
+    expect(destination.pages[0].nodes).toHaveLength(0);
+    expect(destination.deviceTemplates).toHaveLength(MAX_TEMPLATES);
+  });
+
+  it('同じ画像IDの内容が異なる場合は貼り付けを断り、既存画像を変えない', () => {
+    const source = createEmptyDocument();
+    const sourceNodeId = addCustomNode(source);
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+    const destination = createEmptyDocument();
+    const existing = tinyPngVariant(1);
+    destination.assets['img-source'] = existing;
+
+    expect(pasteClipboard(P, data, { dx: 0, dy: 0 })(destination)).toEqual({ ok: false, error: 'invalid-value' });
+    expect(destination.assets).toEqual({ 'img-source': existing });
+    expect(destination.pages[0].nodes).toHaveLength(0);
+  });
+
+  it('画像上限を超える貼り付けは document-too-large で断る', () => {
+    const source = createEmptyDocument();
+    const sourceNodeId = addCustomNode(source);
+    const data = copySelection(source, P, { nodeIds: [sourceNodeId] })!;
+    const destination = createEmptyDocument();
+    destination.assets = Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`img-${index}`, TINY_PNG]));
+
+    expect(pasteClipboard(P, data, { dx: 0, dy: 0 })(destination)).toEqual({ ok: false, error: 'document-too-large' });
+    expect(destination.assets).toHaveProperty('img-0', TINY_PNG);
+    expect(destination.assets).not.toHaveProperty('img-source');
   });
 
   it('空の内容・存在しないページは失敗する', () => {
     const doc = fresh();
-    const empty = { nodes: [], frames: [], edges: [], templates: [], signalTypes: [] };
+    const empty = { nodes: [], frames: [], edges: [], templates: [], signalTypes: [], assets: {} };
     expect(pasteClipboard(P, empty, { dx: 0, dy: 0 })(doc).ok).toBe(false);
     const data = copySelection(doc, P, { nodeIds: ['sw'] })!;
     expect(pasteClipboard('nope', data, { dx: 0, dy: 0 })(doc).error).toBe('unknown-page');

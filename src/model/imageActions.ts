@@ -164,9 +164,10 @@ export function clearNodesImage(pageId: string, nodeIds: readonly string[]): Act
   };
 }
 
-/** どの機器からも使われていない画像を除いた assets を返す(保存のとき。元の doc は変えない) */
-export function usedAssets(doc: Pick<DiagramDocument, 'assets' | 'pages'>): Record<string, string> {
+/** どの機器・登録テンプレートからも使われていない画像を除いた assets を返す(保存のとき。元の doc は変えない) */
+export function usedAssets(doc: Pick<DiagramDocument, 'assets' | 'deviceTemplates' | 'pages'>): Record<string, string> {
   const used = new Set<string>();
   for (const page of doc.pages) for (const n of page.nodes) if (n.imageId) used.add(n.imageId);
+  for (const template of doc.deviceTemplates) if (template.imageId) used.add(template.imageId);
   return Object.fromEntries(Object.entries(doc.assets ?? {}).filter(([id]) => used.has(id)));
 }

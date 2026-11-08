@@ -3,6 +3,7 @@ import { isValidPageSize, MAX_PAGE, MIN_PAGE } from './pageSize';
 import { assetsIssue } from './images';
 import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from './docLimits';
 import { isHexColor } from './signalActions';
+import { MAX_TEMPLATES } from './templateActions';
 import { CURRENT_VERSION, DOCUMENT_FORMAT } from './types';
 import type { DiagramDocument, DeviceTemplate } from './types';
 
@@ -40,7 +41,10 @@ function checkShape(doc: Record<string, unknown>): string[] {
   };
   records('signalTypes', doc.signalTypes);
   if (records('deviceTemplates', doc.deviceTemplates)) {
-    (doc.deviceTemplates as Record<string, unknown>[]).forEach((t, i) => records(`deviceTemplates[${i}].portGroups`, t.portGroups));
+    (doc.deviceTemplates as Record<string, unknown>[]).forEach((t, i) => {
+      records(`deviceTemplates[${i}].portGroups`, t.portGroups);
+      if (t.size !== undefined && !isRecord(t.size)) bad(`deviceTemplates[${i}].size はオブジェクトである必要があります`);
+    });
   }
   if (!Array.isArray(doc.pages) || doc.pages.length === 0) {
     bad('pages は1ページ以上の配列である必要があります');
@@ -124,6 +128,16 @@ function checkFields(doc: Record<string, unknown>): string[] {
     str(w, 'kind', t.kind);
     oneOf(w, 'shape', t.shape, SHAPE_VALUES);
     str(w, 'iconRef', t.iconRef, true);
+    str(w, 'imageId', t.imageId, true);
+    if (typeof t.imageId === 'string' && !(isRecord(doc.assets) && typeof doc.assets[t.imageId] === 'string')) {
+      bad(`${w}.imageId「${t.imageId.slice(0, 40)}」の画像が assets にありません`);
+    }
+    if (isRecord(t.size)) {
+      num(`${w}.size`, 'w', t.size.w);
+      num(`${w}.size`, 'h', t.size.h);
+      if (typeof t.size.w === 'number' && (t.size.w <= 0 || t.size.w > MAX_PAGE)) bad(`${w}.size.w は0より大きく${MAX_PAGE}以下である必要があります`);
+      if (typeof t.size.h === 'number' && (t.size.h <= 0 || t.size.h > MAX_PAGE)) bad(`${w}.size.h は0より大きく${MAX_PAGE}以下である必要があります`);
+    }
     groups(`${w}.portGroups`, t.portGroups as Record<string, unknown>[]);
   });
   (doc.pages as Record<string, unknown>[]).forEach((page, pi) => {
@@ -208,6 +222,10 @@ export function validateDocument(input: unknown): ValidationResult {
     errors.push('grid.size は正の整数である必要があります');
   }
   if (errors.length > 0) return { ok: false, errors };
+  // 件数上限は、各テンプレートを走査する構造検査より先に見る。巨大な配列で検証自体が固まるのを防ぐ
+  if (Array.isArray(input.deviceTemplates) && input.deviceTemplates.length > MAX_TEMPLATES) {
+    return { ok: false, errors: [`テンプレートは図全体で${MAX_TEMPLATES}件までです`] };
+  }
   const shapeErrors = checkShape(input);
   if (shapeErrors.length > 0) return { ok: false, errors: shapeErrors };
   const fieldErrors = checkFields(input);

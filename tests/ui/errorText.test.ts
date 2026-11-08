@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getLanguage, setLanguage } from '../../src/i18n';
 import type { ActionError } from '../../src/model/actions';
 import { MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from '../../src/model/docLimits';
+import { MAX_TEMPLATES } from '../../src/model/templateActions';
 import { errorText } from '../../src/ui/errorText';
 
 let saved: ReturnType<typeof getLanguage>;
@@ -27,6 +28,8 @@ const ALL_ERRORS: ActionError[] = [
   'unknown-frame',
   'unknown-signal',
   'signal-in-use',
+  'template-in-use',
+  'too-many-templates',
   'page-too-small',
   'import-no-space',
   'document-too-large',
@@ -53,5 +56,9 @@ describe('errorText', () => {
   it('図が大きすぎる場合は、上限の数値を示す', () => {
     const text = errorText({ ok: false, error: 'document-too-large' });
     for (const n of [MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE, MAX_EDGES_PER_PAGE]) expect(text).toContain(String(n));
+  });
+
+  it('テンプレート上限のエラーは上限数を示す', () => {
+    expect(errorText({ ok: false, error: 'too-many-templates' })).toContain(String(MAX_TEMPLATES));
   });
 });

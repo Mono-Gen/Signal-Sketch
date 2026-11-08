@@ -19,10 +19,11 @@ Place devices, define their ports, and connect ports with the mouse. Lines are r
 - Export: JSON (save/open), SVG and PNG (text kept as real text, so it pastes into PowerPoint), CSV device list
 - Import a device list (CSV) to create a first draft of devices and frames (no connections); the header row must match the exported CSV exactly. Details in the user guide; a sample is in [docs/sample_devices.csv](docs/sample_devices.csv)
 - Set your own images on devices (PNG / JPEG / WebP, stored inside the diagram file) and change device sizes
+- Register a placed device (name, ports, image and size) in the diagram and reuse it from the palette
 - Japanese / English UI switching
 - Runs from a single HTML file opened in a browser: no server, no installation
 
-Not yet available: registering reusable custom devices, multiple pages, direct `.pptx` export.
+Not yet available: multiple pages, direct `.pptx` export.
 
 ## Using it
 

@@ -43,6 +43,15 @@ describe('addNodesInRow', () => {
     expect(nodes(doc)).toHaveLength(1);
   });
 
+  it('登録サイズがページより大きい場合は縮め、1台ならページ内へ配置する', () => {
+    const doc = fresh();
+    const page = doc.pages[0];
+    const oversized = { ...tpl(), id: 'custom-oversized-row', size: { w: 4000, h: 4000 } };
+    const result = addNodesInRow(P, oversized, '大型機器', { count: 1, direction: 'horizontal', gap: 0 }, { x: 9999, y: 9999 })(doc);
+    expect(result.ok).toBe(true);
+    expect(nodes(doc)[0]).toMatchObject({ x: 0, y: 0, w: page.size.w, h: page.size.h });
+  });
+
   it('グリッド無効なら、刻みは機器の大きさ+間隔そのまま', () => {
     const doc = fresh();
     doc.grid.enabled = false;

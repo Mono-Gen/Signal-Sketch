@@ -57,7 +57,7 @@ export class DocumentStore {
     const draft = { ...structuredClone(rest), assets } as DiagramDocument;
     const result = action(draft);
     if (!result.ok) return result;
-    // どの機器からも使われなくなった画像は、図から外す(外す・差し替える・機器を消すたびに、枚数の上限へ近づかないよう)
+    // どの機器・登録テンプレートからも使われなくなった画像は、図から外す(外す・差し替える・機器を消すたびに、枚数の上限へ近づかないよう)
     if (draft.assets && Object.keys(draft.assets).length > 0) {
       const used = usedAssets(draft);
       if (Object.keys(used).length !== Object.keys(draft.assets).length) draft.assets = used;

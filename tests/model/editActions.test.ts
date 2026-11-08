@@ -66,6 +66,15 @@ describe('addNodeFromTemplate', () => {
     expect(node(doc, r.created!).w).toBe(490);
   });
 
+  it('登録サイズがページより大きくても、最小サイズを守ってページ内へ収める', () => {
+    const doc = fresh();
+    const page = doc.pages[0];
+    const oversized = { ...preset('speaker'), id: 'custom-oversized', size: { w: 4000, h: 4000 } };
+    const result = addNodeFromTemplate(P, oversized, '大型機器', { x: page.size.w, y: page.size.h })(doc);
+    expect(result.ok).toBe(true);
+    expect(node(doc, result.created!)).toMatchObject({ x: 0, y: 0, w: page.size.w, h: page.size.h });
+  });
+
   it('追加後のドキュメントは検証に通る', () => {
     const doc = fresh();
     addNodeFromTemplate(P, preset('amp'), 'AMP')(doc);

@@ -88,6 +88,13 @@ Right-click on the diagram to open a menu with the actions available at that spo
 - Copying or duplicating a device shares the same image. SVG and PNG exports include the images.
 - Rights to the images (copyright, trademarks and so on) are your responsibility.
 
+### Register a device in "In this diagram"
+
+- Select one device and press **Register this device…** in the Image section of the right panel. Enter a registration name (1–100 characters after trimming leading and trailing spaces). The device's **effective port setup, image and size** are added to "In this diagram" in the palette. Its model, quantity and position are not registered.
+- If that registration name already exists, a number such as `(2)` or `(3)` is appended. You can place the registered device just like a standard device: click, drag, or Shift+drop to add a row. Its registered image and size are carried over.
+- A registration belongs to that diagram file only. One diagram can hold up to 200 device types in total, including standard types already used in the diagram.
+- Press the small **×** on a palette item to delete its registration. A registration cannot be deleted while any placed device still uses it; the reason appears at the top right. Delete those devices first. Deleting a registration can be undone.
+
 ### Devices with a quantity of two or more
 
 With a quantity of 2 or more, **ports are shown for every unit**, so each unit can be connected to a different destination. Tooltips show which unit, such as "LAN (Unit 3)". If lowering the quantity would remove connected ports, you are asked to confirm.
@@ -222,7 +229,7 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 ## 11. Known limitations
 
 - A diagram is a single page. Multiple pages are not supported.
-- Images are set per device (there is no way to register an image once and place it from the palette). SVG images, cropping and rotating are not supported.
+- SVG images, cropping and rotating are not supported.
 - You cannot adjust line routes by hand.
 - There are size limits (they keep the screen from freezing). Per device: a quantity of 1 to 999 and at most 5000 ports in total. Per page: 2000 devices, 20000 ports in total and 20000 connections. A diagram file can be up to 20 MB, and a device-list CSV up to 5 MB (10000 data rows). Files over a limit cannot be opened.
 - While dragging a frame, the devices inside do not follow; they all move when you drop it.

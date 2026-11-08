@@ -14,8 +14,10 @@ import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSig
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
+import { registerTemplate } from '../model/templateActions';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
+import { askRegistrationName } from './registerDeviceDialog';
 
 export interface PanelContext {
   getDoc(): DiagramDocument;
@@ -356,7 +358,7 @@ export class PropertiesPanel {
       field(t('props.count'), count),
       ...(node.count && node.count > 1 ? [el('p', { className: 'hint', text: t('props.unitPortsHint') })] : []),
       this.sizeFields(node),
-      this.imageSection([node.id]),
+      this.imageSection([node.id], true),
     ]);
   }
 
@@ -383,7 +385,7 @@ export class PropertiesPanel {
    * 機器の画像。ファイルを選ぶと、縮小・再符号化して図に入れる。外すと、小さなアイコンに戻る。
    * 複数の機器を選んでいるときは、選んだ機器すべてに(縮小・再符号化は1回だけ行い、同じ画像を共有する)。
    */
-  private imageSection(nodeIds: readonly string[]): HTMLElement {
+  private imageSection(nodeIds: readonly string[], allowRegistration = false): HTMLElement {
     const page = getPage(this.ctx.getDoc(), this.ctx.pageId);
     const anyImage = nodeIds.some((id) => page?.nodes.find((n) => n.id === id)?.imageId);
     const file = el('input', {
@@ -407,11 +409,29 @@ export class PropertiesPanel {
         },
       },
     });
+    const register = allowRegistration
+      ? el('button', {
+          text: t('props.registerDevice'),
+          attrs: { type: 'button', 'data-action': 'register-device' },
+          on: { click: () => void this.registerDevice(nodeIds[0]) },
+        })
+      : undefined;
     return el('div', { className: 'section', attrs: { 'data-section': 'image' } }, [
       el('h3', { text: t('props.image') }),
-      el('div', { className: 'button-row' }, [choose, remove, file]),
+      el('div', { className: 'button-row' }, [choose, remove, file, ...(register ? [register] : [])]),
       el('p', { className: 'hint', text: t('props.imageHint') }),
     ]);
+  }
+
+  /** 名前を確認して、選択中の1台を「この図の機器」へ登録する */
+  private async registerDevice(nodeId: string): Promise<void> {
+    const node = getPage(this.ctx.getDoc(), this.ctx.pageId)?.nodes.find((candidate) => candidate.id === nodeId);
+    if (!node) return;
+    const name = await askRegistrationName(node.label);
+    if (!name) return;
+    if (this.ctx.apply(registerTemplate(this.ctx.pageId, nodeId, name)).ok) {
+      this.ctx.setStatus('ok', t('status.deviceRegistered'));
+    }
   }
 
   /** いちばん新しい画像の取り込みの番号。古い取り込みが、あとから完了しても、結果を捨てるために使う */

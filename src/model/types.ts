@@ -41,6 +41,10 @@ export interface DeviceTemplate {
   kind: string;
   shape: Shape;
   iconRef?: string;
+  /** 登録した機器を置くときに使う画像(図の assets の ID) */
+  imageId?: string;
+  /** 登録した機器を置くときの大きさ。標準機器は省略し、自動サイズを使う */
+  size?: { w: number; h: number };
   portGroups: PortGroup[];
 }
 

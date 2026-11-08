@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CURRENT_VERSION, DOCUMENT_FORMAT } from '../../src/model/types';
 import type { DiagramDocument } from '../../src/model/types';
 import { validateDocument } from '../../src/model/validate';
+import { MAX_TEMPLATES } from '../../src/model/templateActions';
+import { MAX_PAGE } from '../../src/model/pageSize';
+import { TINY_PNG } from '../fixtures/tinyImage';
 
 /** 検証に通る最小のドキュメント(テストごとに壊して使う) */
 function valid(): DiagramDocument {
@@ -147,5 +150,43 @@ describe('validateDocument', () => {
     doc.pages[0].edges[0].to.nodeId = 'x2';
     const r = validateDocument(doc);
     expect(r.errors.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('テンプレートの imageId は assets に存在する画像だけを許す', () => {
+    const doc = valid();
+    doc.deviceTemplates[0].imageId = 'img-a';
+    expect(validateDocument(doc).ok).toBe(false);
+    doc.assets['img-a'] = TINY_PNG;
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
+  it.each([
+    [{ w: 0, h: 10 }, '0'],
+    [{ w: 10, h: -1 }, '-1'],
+    [{ w: Number.POSITIVE_INFINITY, h: 10 }, 'Infinity'],
+    [{ w: MAX_PAGE + 1, h: 10 }, String(MAX_PAGE + 1)],
+  ])('テンプレートの不正な size を拒否する: %j', (size) => {
+    const doc = valid();
+    doc.deviceTemplates[0].size = size;
+    expect(validateDocument(doc).ok).toBe(false);
+  });
+
+  it('テンプレートの size は正の有限値で、ページ最大以下なら許す', () => {
+    const doc = valid();
+    doc.deviceTemplates[0].size = { w: 0.5, h: MAX_PAGE };
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
+  it('テンプレート数は上限まで許し、上限+1件を拒否する', () => {
+    const doc = valid();
+    const base = doc.deviceTemplates[0];
+    while (doc.deviceTemplates.length < MAX_TEMPLATES) {
+      doc.deviceTemplates.push({ ...structuredClone(base), id: `template-${doc.deviceTemplates.length}` });
+    }
+    expect(validateDocument(doc).ok).toBe(true);
+    doc.deviceTemplates.push({ ...structuredClone(base), id: 'over-limit' });
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(String(MAX_TEMPLATES));
   });
 });

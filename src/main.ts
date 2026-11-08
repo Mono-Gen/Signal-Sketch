@@ -7,6 +7,7 @@ import { diagnose } from './model/diagnostics';
 import { addFrame } from './model/frames';
 import { PRESETS, presetToTemplate } from './model/presets';
 import { getTemplate } from './model/query';
+import { removeTemplate } from './model/templateActions';
 import { DocumentStore } from './state/store';
 import { createAppChrome } from './ui/appChrome';
 import { createClipboardCommands } from './ui/clipboardCommands';
@@ -112,7 +113,15 @@ async function addRowFromPalette(item: PaletteItem, at: { x: number; y: number }
 }
 
 let currentTheme: ThemeName = 'light'; // テーマ制御の初期化(下)で、実際の値に更新される
-const palette = new Palette($('palette'), () => store.doc, (item) => addFromPalette(item), () => themeFor(currentTheme));
+const palette = new Palette(
+  $('palette'),
+  () => store.doc,
+  (item) => addFromPalette(item),
+  (templateId) => {
+    if (apply(removeTemplate(templateId)).ok) setStatus('ok', t('status.deviceRegistrationRemoved'));
+  },
+  () => themeFor(currentTheme),
+);
 
 // パレットからキャンバスへのドラッグ&ドロップ
 graphEl.addEventListener('dragover', (ev) => {
