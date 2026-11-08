@@ -37,6 +37,47 @@ const tinyPngVariant = (marker: number): string => {
   return `data:image/png;base64,${btoa(String.fromCharCode(...bytes))}`;
 };
 
+describe('貼り付けの境界(iconRef・ずらし量)', () => {
+  it('同じIDで iconRef だけ違う登録は、別の定義として両方残る', () => {
+    const src = fresh();
+    const n = addCustomNode(src, customTemplate({ iconRef: 'speaker' }));
+    const data = copySelection(src, P, { nodeIds: [n] })!;
+    const dst = fresh();
+    dst.assets['img-source'] = TINY_PNG;
+    dst.deviceTemplates.push(customTemplate({ iconRef: 'amp' }));
+    const r = paste(dst, data);
+    expect(r.ok).toBe(true);
+    const custom = dst.deviceTemplates.filter((t) => t.name === '登録スピーカー');
+    expect(custom).toHaveLength(2);
+    const pasted = dst.pages[0].nodes.find((x) => x.id === r.createdNodeIds![0])!;
+    expect(pasted.templateId).not.toBe('custom-1');
+    expect(dst.deviceTemplates.find((t) => t.id === pasted.templateId)!.iconRef).toBe('speaker');
+  });
+
+  it('同じIDで内容も同一なら、定義は増えない', () => {
+    const src = fresh();
+    const n = addCustomNode(src, customTemplate({ iconRef: 'speaker' }));
+    const data = copySelection(src, P, { nodeIds: [n] })!;
+    const dst = fresh();
+    dst.assets['img-source'] = TINY_PNG;
+    dst.deviceTemplates.push(customTemplate({ iconRef: 'speaker' }));
+    const before = dst.deviceTemplates.length;
+    expect(paste(dst, data).ok).toBe(true);
+    expect(dst.deviceTemplates).toHaveLength(before);
+  });
+
+  it('ずらし量が NaN・Infinity なら失敗し、図は変わらない', () => {
+    const doc = fresh();
+    const data = copySelection(doc, P, { nodeIds: [doc.pages[0].nodes[0].id] })!;
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      const copy = structuredClone(doc);
+      expect(pasteClipboard(P, data, { dx: bad, dy: 0 })(copy).ok).toBe(false);
+      expect(pasteClipboard(P, data, { dx: 0, dy: bad })(copy).ok).toBe(false);
+      expect(copy).toEqual(doc);
+    }
+  });
+});
+
 describe('copySelection', () => {
   it('何も選ばれていない・存在しないページは null', () => {
     const doc = fresh();

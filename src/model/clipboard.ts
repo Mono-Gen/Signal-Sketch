@@ -106,6 +106,7 @@ function sameTemplate(a: DeviceTemplate, b: DeviceTemplate): boolean {
     a.kind === b.kind &&
     a.shape === b.shape &&
     a.imageId === b.imageId &&
+    a.iconRef === b.iconRef &&
     sameSize(a.size, b.size) &&
     samePortGroups(a.portGroups, b.portGroups)
   );
@@ -184,6 +185,8 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     const page = getPage(doc, pageId);
     if (!page) return { ok: false, error: 'unknown-page' };
     if (data.nodes.length === 0 && data.frames.length === 0) return { ok: false, error: 'invalid-value' };
+    // NaN/Infinity が座標に入ると保存後に読み込めない図になるため、ずらし量は有限値に限る。
+    if (!Number.isFinite(offset.dx) || !Number.isFinite(offset.dy)) return { ok: false, error: 'invalid-value' };
 
     const referencedAssetIds = new Set<string>();
     for (const node of data.nodes) if (node.imageId) referencedAssetIds.add(node.imageId);
