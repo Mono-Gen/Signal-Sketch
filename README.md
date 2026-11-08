@@ -15,8 +15,10 @@ Place devices, define their ports, and connect ports with the mouse. Lines are r
 - Editable legend (signal types)
 - Adjustable page size (16:9 presets or custom) and zoom
 - Devices with a quantity show one set of ports per unit
-- Box-select several devices to delete, copy or move them together; Shift+drop a device from the palette to add several in a row
-- Export: JSON (save/open), SVG and PNG (text kept as real text, so it pastes into PowerPoint), CSV device list
+- Box-select several devices to delete, copy, move, align or space them evenly; Shift+drop a device from the palette to add several in a row
+- Connect many ports at once (box-select ports, drag them onto a destination; it continues into the other devices of the same frame)
+- Right-click menu, copy / paste / duplicate, light / dark / automatic color theme
+- Export: JSON (save/open), SVG and PNG (text kept as real text, so it pastes into PowerPoint; device images are included, but whether PowerPoint shows images inside an SVG has not been verified, so PNG is the safe choice for them), CSV device list
 - Import a device list (CSV) to create a first draft of devices and frames (no connections); the header row must match the exported CSV exactly. Details in the user guide; a sample is in [docs/sample_devices.csv](docs/sample_devices.csv)
 - Set your own images on devices (PNG / JPEG / WebP, stored inside the diagram file) and change device sizes
 - Register a placed device (name, ports, image and size) in the diagram and reuse it from the palette
@@ -61,7 +63,8 @@ npm run audit      # checks the dependencies for known vulnerabilities
 ## Security notes
 
 - The app runs entirely in the browser. It makes no network requests and sends no data anywhere; the only things it stores in the browser are your language and color theme (light/dark) settings.
-- Files you open are checked before use (structure, the type of every field, references, and limits on file size, quantities, port counts and the size of a page), and every name from a file is escaped before it is shown. Even so, open diagram files only from sources you trust.
+- Files you open are checked before use (structure, the type of every field, references, limits on file size, quantities, port counts and the size of a page, and the format and size of every embedded image), and every name from a file is escaped before it is shown. Even so, open diagram files only from sources you trust.
+- Images you add are processed in the browser only: the type and pixel count are checked from the file header before decoding, then the image is shrunk and re-encoded. SVG images are not accepted.
 - The build output carries a Content-Security-Policy that forbids network access, external resources and form submission.
 - CSV exports prefix values that start with `=`, `+`, `-` or `@` with `'` so spreadsheet software does not run them as formulas; the CSV import removes that mark again.
 

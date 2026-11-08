@@ -174,12 +174,14 @@ With nothing selected, the right panel edits the signal types.
 
 | Action | Result |
 |---|---|
-| Save / Open | Save and load the diagram as a JSON file. Ctrl+S also saves |
-| Export SVG | Text is written as real text, so it can be pasted into PowerPoint and similar. Includes the legend |
-| Export PNG | A double-resolution image. Includes the legend |
+| Save / Open | Save and load the diagram as a JSON file. Ctrl+S also saves. Device images are stored inside the diagram file (handing over the file hands over the images too) |
+| Export SVG | Text is written as real text, so it can be pasted into PowerPoint and similar. Includes the legend. Device images are included (see the note below) |
+| Export PNG | A double-resolution image. Includes the legend. Device images are included |
 | Device list (CSV) | Name, model, quantity, type, ports, location (the name of the frame it belongs to). Identical devices are merged into one row and quantities are summed. Opens in Excel |
 
 If there are unsaved changes, "New" and "Open" ask for confirmation.
+
+**Note for pasting into PowerPoint (diagrams with images):** the SVG export embeds device images inside the SVG as images. Whether PowerPoint shows them can depend on its version, and **this has not been verified yet**. If they do not appear, use the **PNG export** instead (it always pastes; the text is no longer editable). Devices without an image are exported as shapes as before, so their SVG works as is.
 
 ### Importing a device list (CSV)
 
@@ -221,6 +223,9 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 | Ctrl+`+` / Ctrl+`-` / Ctrl+0 | Zoom in / zoom out / back to 100% |
 | Ctrl+A | Select everything (devices, frames, lines) |
 | Delete / Backspace | Delete the selected devices, lines and frames |
+| Right-click | Menu (copy, duplicate, delete, paste, select all; with two or more devices selected, also align and space evenly) |
+| Drag (a device handle, with a single device selected) | Resize it |
+| Shift+drag (a device handle) | Resize a device with an image to fit the image's aspect ratio |
 | Shift+drag (a port) | Move the port's position |
 | Shift+drag (an empty spot) | Select the ports inside the box (then drag them to connect at once) |
 | Esc | Clear the port selection / cancel while dragging |
@@ -229,7 +234,8 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 ## 11. Known limitations
 
 - A diagram is a single page. Multiple pages are not supported.
-- SVG images, cropping and rotating are not supported.
+- SVG images, cropping and rotating are not supported. An image can be up to 5 MB and 40 million pixels as a file, and is shrunk to at most 640 px on its longest side when added (enlarging it makes it blurry). One diagram can hold up to 50 images, 5 MB in total.
+- Devices registered under "Devices in this diagram" cannot be renamed or edited (delete and register again). Registrations are usable only inside that diagram file.
 - You cannot adjust line routes by hand.
 - There are size limits (they keep the screen from freezing). Per device: a quantity of 1 to 999 and at most 5000 ports in total. Per page: 2000 devices, 20000 ports in total and 20000 connections. A diagram file can be up to 20 MB, and a device-list CSV up to 5 MB (10000 data rows). Files over a limit cannot be opened.
 - While dragging a frame, the devices inside do not follow; they all move when you drop it.
