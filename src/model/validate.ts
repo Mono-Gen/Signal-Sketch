@@ -3,6 +3,7 @@ import { isValidPageSize, MAX_PAGE, MIN_PAGE } from './pageSize';
 import { assetsIssue } from './images';
 import { MAX_NOTE_FONT, MAX_NOTE_LENGTH, MAX_NOTES_PER_PAGE, MIN_NOTE_FONT } from './notes';
 import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from './docLimits';
+import { LINE_STYLES } from './lineStyle';
 import { isHexColor } from './signalActions';
 import { MAX_TEMPLATES } from './templateActions';
 import { CURRENT_VERSION, DOCUMENT_FORMAT } from './types';
@@ -122,6 +123,7 @@ function checkFields(doc: Record<string, unknown>): string[] {
     str(w, 'id', s.id);
     str(w, 'label', s.label);
     str(w, 'color', s.color);
+    if (s.lineStyle !== undefined) oneOf(w, 'lineStyle', s.lineStyle, LINE_STYLES);
   });
   (doc.deviceTemplates as Record<string, unknown>[]).forEach((t, i) => {
     const w = `deviceTemplates[${i}]`;

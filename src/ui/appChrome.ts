@@ -2,6 +2,7 @@ import { APP_NAME } from '../app/appInfo';
 import { getLanguage, t } from '../i18n';
 import type { MessageKey } from '../i18n';
 import { diagnose } from '../model/diagnostics';
+import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import type { DocumentStore } from '../state/store';
 import type { DiagramView } from '../view/diagramView';
 import { signalColor } from '../view/theme';
@@ -49,7 +50,13 @@ export function createAppChrome(deps: AppChromeDeps): AppChrome {
       item.className = 'item';
       const swatch = document.createElement('span');
       swatch.className = 'swatch';
-      swatch.style.background = signalColor(deps.getTheme(), s.color);
+      const color = signalColor(deps.getTheme(), s.color);
+      const pattern = DASH_PATTERN[lineStyleOf(s)];
+      // 破線・点線は、見本の帯を、色と透明の繰り返しで描く(パターンの「線 間隔」の数値を、そのまま使う)
+      if (pattern) {
+        const [on, off] = pattern.split(' ').map(Number);
+        swatch.style.background = `repeating-linear-gradient(90deg, ${color} 0 ${on}px, transparent ${on}px ${on + off}px)`;
+      } else swatch.style.background = color;
       item.append(swatch, document.createTextNode(s.label));
       legendEl.append(item);
     }

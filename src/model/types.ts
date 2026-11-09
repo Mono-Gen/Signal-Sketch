@@ -1,5 +1,6 @@
 // データモデルの型定義。設計書 4章に対応する。
 // 接続データ(edges)が正本であり、線の色や描画位置は描画時に導出する(SSOT)。
+import type { LineStyle } from './lineStyle';
 
 /**
  * ファイル形式の識別子。アプリ名を含めない中立の値にして、
@@ -20,6 +21,8 @@ export interface SignalType {
   label: string;
   /** 線の色(CSSの色指定) */
   color: string;
+  /** 線の種類。なければ実線 */
+  lineStyle?: LineStyle;
 }
 
 /** ポートのグループ定義。実体は派生させる(例: LAN x 24) */

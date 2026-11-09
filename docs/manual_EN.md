@@ -178,6 +178,7 @@ You can put text-only notes on the diagram (no frame, no background).
 With nothing selected, the right panel edits the signal types.
 
 - You can rename, recolor, reorder, add and delete types. A color change updates lines, ports and the legend at once.
+- You can choose a **line style** (solid, dashed, dotted) for each signal. It helps people who find colors hard to tell apart, and black-and-white printing (for example, solid for LAN and dashed for the rest). The legend swatch and the SVG / PNG exports show the same style. Lines **with an issue** (direction or signal mismatch) are still shown dashed or dotted as before, whatever the signal's style.
 - A type in use cannot be deleted (whether ports use it or a device type definition refers to it).
 - Renaming keeps the internal ID, so connections are not broken.
 - The defaults are five types: LAN, CONTROL, HDMI, USB and AUDIO.

@@ -1,5 +1,7 @@
 import type { Action, ActionResult } from './actions';
 import { uniqueId } from './ids';
+import { isLineStyle } from './lineStyle';
+import type { LineStyle } from './lineStyle';
 import { getNodePorts } from './query';
 import type { DiagramDocument } from './types';
 
@@ -39,14 +41,17 @@ export function addSignalType(label: string, color: string): Action {
 }
 
 /** 信号種別の名称・色を変更する。IDは変えない */
-export function updateSignalType(id: string, patch: { label?: string; color?: string }): Action {
+export function updateSignalType(id: string, patch: { label?: string; color?: string; lineStyle?: LineStyle }): Action {
   return (doc) => {
     const s = doc.signalTypes.find((x) => x.id === id);
     if (!s) return fail('unknown-signal');
     if (patch.label !== undefined && patch.label.trim() === '') return fail('invalid-value');
     if (patch.color !== undefined && !isHexColor(patch.color)) return fail('invalid-value');
+    if (patch.lineStyle !== undefined && !isLineStyle(patch.lineStyle)) return fail('invalid-value');
     if (patch.label !== undefined) s.label = patch.label.trim();
     if (patch.color !== undefined) s.color = patch.color;
+    if (patch.lineStyle === 'solid') delete s.lineStyle; // 実線は既定なので、項目ごと持たない
+    else if (patch.lineStyle !== undefined) s.lineStyle = patch.lineStyle;
     return OK;
   };
 }

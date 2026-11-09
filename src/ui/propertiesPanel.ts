@@ -15,6 +15,8 @@ import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '.
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
 import { registerTemplate } from '../model/templateActions';
+import { LINE_STYLES, lineStyleOf } from '../model/lineStyle';
+import type { LineStyle } from '../model/lineStyle';
 import { resizeNodes, setPortGroupsMany, updateNodes } from '../model/bulkActions';
 import { resizeNote, updateNotes } from '../model/noteActions';
 import { DEFAULT_NOTE_FONT, MAX_NOTE_FONT, MAX_NOTE_LENGTH, MIN_NOTE_FONT } from '../model/notes';
@@ -425,11 +427,19 @@ export class PropertiesPanel {
           },
         },
       });
+      const lineSelect = select(
+        LINE_STYLES.map((v) => ({ value: v, label: t(`legend.line.${v}` as MessageKey) })),
+        lineStyleOf(s),
+      );
+      lineSelect.setAttribute('aria-label', t('legend.lineLabel'));
+      lineSelect.setAttribute('data-prop', 'signal-line');
+      lineSelect.addEventListener('change', () => this.ctx.apply(updateSignalType(s.id, { lineStyle: lineSelect.value as LineStyle })));
       const button = (text: string, aria: string, action: string, disabled: boolean, onClick: () => void) =>
         el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click: onClick } });
       const row = el('div', { className: 'signal-row', attrs: { 'data-signal': s.id } }, [
         color,
         label,
+        lineSelect,
         button(t('legend.up'), t('legend.upLabel'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1))),
         button(t('legend.down'), t('legend.downLabel'), 'signal-down', i === last, () => this.ctx.apply(moveSignalType(s.id, 1))),
         button(t('legend.remove'), t('legend.remove'), 'signal-remove', false, () => this.ctx.apply(removeSignalType(s.id))),
@@ -437,6 +447,7 @@ export class PropertiesPanel {
       if (used > 0) row.title = t('legend.usage', { count: used });
       section.append(row);
     });
+    section.append(el('p', { className: 'hint', text: t('legend.lineHint') }));
     section.append(
       el('button', {
         text: t('legend.add'),

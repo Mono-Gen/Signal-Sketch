@@ -7,6 +7,8 @@ import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
 import type { PortRef, Side } from '../model/types';
 import type { DocumentStore } from '../state/store';
+import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
+import type { SignalType } from '../model/types';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
 import { escapeHtml } from '../util/escapeHtml';
 import { imageBox, isImageDataUri } from '../model/images';
@@ -16,6 +18,12 @@ import { portTooltipHtml } from './portTooltip';
 import { FLAT_THEME, signalColor } from './theme';
 import type { Theme } from './theme';
 import { anchorScrollDelta, clampZoom } from './zoom';
+
+/** 信号の線の種類を、maxGraph のスタイルへ変える(実線は何も足さない) */
+function dashStyle(s: SignalType | undefined): { dashed?: boolean; dashPattern?: string } {
+  const pattern = DASH_PATTERN[lineStyleOf(s)];
+  return pattern ? { dashed: true, dashPattern: pattern } : {};
+}
 
 /** 画面からモデルへの要求。画面は状態を持たず、操作はすべてここ経由でモデルへ戻す */
 export interface ViewCallbacks {
@@ -620,6 +628,8 @@ export class DiagramView {
           style: {
             strokeColor: color,
             strokeWidth: th.edgeWidth,
+            // 信号の線の種類(実線・破線・点線)。指摘のある接続は、次の issueStyle が上書きする
+            ...dashStyle(signals.get(fromPort?.signalType ?? '')),
             // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
             // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
             ...this.issueStyle(fromPort, toPort),

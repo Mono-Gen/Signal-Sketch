@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { parseDocument, serializeDocument } from '../../src/io/fileIo';
+import { buildSvg } from '../../src/io/svgExport';
 import { addNodeFromTemplate, setPortGroups } from '../../src/model/actions';
+import { DASH_PATTERN } from '../../src/model/lineStyle';
 import { createEmptyDocument, DEFAULT_SIGNAL_TYPES } from '../../src/model/defaults';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
 import { addSignalType, isHexColor, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../../src/model/signalActions';
@@ -130,5 +133,51 @@ describe('検証', () => {
     expect(isHexColor('#a0B1c2')).toBe(true);
     expect(isHexColor('#abc')).toBe(false);
     expect(isHexColor(123)).toBe(false);
+  });
+});
+
+describe('信号の線の種類(lineStyle)', () => {
+  const fresh = () => createEmptyDocument();
+
+  it('破線・点線を指定でき、実線へ戻すと項目ごと消える', () => {
+    const doc = fresh();
+    const id = doc.signalTypes[0].id;
+    expect(updateSignalType(id, { lineStyle: 'dashed' })(doc).ok).toBe(true);
+    expect(doc.signalTypes[0].lineStyle).toBe('dashed');
+    expect(updateSignalType(id, { lineStyle: 'dotted' })(doc).ok).toBe(true);
+    expect(doc.signalTypes[0].lineStyle).toBe('dotted');
+    expect(updateSignalType(id, { lineStyle: 'solid' })(doc).ok).toBe(true);
+    expect('lineStyle' in doc.signalTypes[0]).toBe(false);
+  });
+
+  it('不正な種類は断り、何も変えない', () => {
+    const doc = fresh();
+    const id = doc.signalTypes[0].id;
+    const r = updateSignalType(id, { lineStyle: 'wavy' as never })(doc);
+    expect(r).toMatchObject({ ok: false, error: 'invalid-value' });
+    expect('lineStyle' in doc.signalTypes[0]).toBe(false);
+  });
+
+  it('保存して読み直しても残り、不正な値を含む図は読み込みで断る', () => {
+    const doc = fresh();
+    updateSignalType(doc.signalTypes[0].id, { lineStyle: 'dashed' })(doc);
+    const parsed = parseDocument(serializeDocument(doc));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.doc.signalTypes[0].lineStyle).toBe('dashed');
+    const bad = JSON.parse(JSON.stringify(doc));
+    bad.signalTypes[0].lineStyle = 'wavy';
+    expect(validateDocument(bad).ok).toBe(false);
+  });
+
+  it('SVG出力で、線と凡例に同じ破線パターンが付く。実線には付かない', () => {
+    const doc = fresh();
+    const [a, b] = doc.signalTypes;
+    updateSignalType(a.id, { lineStyle: 'dashed' })(doc);
+    updateSignalType(b.id, { lineStyle: 'dotted' })(doc);
+    const svg = buildSvg(doc, 'page-1', { edgePoints: new Map(), countText: (n) => `x${n}`, legendTitle: '凡例' });
+    expect(svg).toContain(`stroke-dasharray="${DASH_PATTERN.dashed}"`);
+    expect(svg).toContain(`stroke-dasharray="${DASH_PATTERN.dotted}"`);
+    const solidLegendLines = (svg.match(/<line [^>]*stroke-width="3"[^>]*>/g) ?? []).filter((l) => !l.includes('stroke-dasharray'));
+    expect(solidLegendLines.length).toBe(doc.signalTypes.length - 2);
   });
 });

@@ -3,8 +3,9 @@ import { getNodePorts, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
 import { markerSpec } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
+import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
-import type { DiagramDocument, DiagramNode, DiagramNote } from '../model/types';
+import type { DiagramDocument, DiagramNode, DiagramNote, SignalType } from '../model/types';
 import { escapeHtml } from '../util/escapeHtml';
 import { iconSvgGroup } from '../view/icons';
 import { FLAT_THEME } from '../view/theme';
@@ -195,12 +196,18 @@ function noteSvg(n: DiagramNote, th: Theme): string {
   return `<text font-size="${size}" fill="${esc(n.color ?? th.nodeText)}">${spans}</text>`;
 }
 
+/** 信号の線の種類を、SVG の属性にする(実線は空)。画面と同じパターンを使う */
+function dashAttr(s: SignalType | undefined): string {
+  const pattern = DASH_PATTERN[lineStyleOf(s)];
+  return pattern ? ` stroke-dasharray="${pattern}"` : '';
+}
+
 /** 凡例(信号の種類と線の色)。図だけを貼っても、色の意味が伝わるように含める */
 function legendSvg(doc: DiagramDocument, y: number, opts: SvgExportOptions, th: Theme): string {
   const items: string[] = [`<text x="12" y="${num(y + 24)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(opts.legendTitle)}</text>`];
   let x = 12 + 8 * (opts.legendTitle.length + 2);
   for (const s of doc.signalTypes) {
-    items.push(`<line x1="${num(x)}" y1="${num(y + 20)}" x2="${num(x + 28)}" y2="${num(y + 20)}" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round"/>`);
+    items.push(`<line x1="${num(x)}" y1="${num(y + 20)}" x2="${num(x + 28)}" y2="${num(y + 20)}" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round"${dashAttr(s)}/>`);
     items.push(`<text x="${num(x + 36)}" y="${num(y + 24)}" font-size="12" fill="${th.modelText}">${esc(s.label)}</text>`);
     x += 36 + 8 * s.label.length + 24;
   }
@@ -239,7 +246,7 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
     const fromNode = page.nodes.find((n) => n.id === e.from.nodeId);
     const fromPort = fromNode ? getNodePorts(doc, fromNode).find((p) => p.id === e.from.portId) : undefined;
     const color = signals.get(fromPort?.signalType ?? '')?.color ?? '#666666';
-    edges.push(`<path d="${roundedPath(pts, CORNER_RADIUS)}" fill="none" stroke="${esc(color)}" stroke-width="${th.edgeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`);
+    edges.push(`<path d="${roundedPath(pts, CORNER_RADIUS)}" fill="none" stroke="${esc(color)}" stroke-width="${th.edgeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr(signals.get(fromPort?.signalType ?? ''))}/>`);
   }
 
   const nodes = page.nodes.map((n, i) => nodeSvg(doc, n, i, connected, opts, th));
