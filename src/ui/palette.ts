@@ -9,7 +9,7 @@ import type { Theme } from '../view/theme';
 import { el } from './dom';
 
 export interface PaletteItem {
-  source: 'preset' | 'doc' | 'frame';
+  source: 'preset' | 'doc' | 'frame' | 'note';
   id: string;
 }
 
@@ -30,7 +30,10 @@ export class Palette {
     const doc = this.getDoc();
     this.root.replaceChildren(el('h2', { text: t('palette.title') }), el('p', { className: 'hint', text: t('palette.hint') }));
 
-    this.root.append(el('h3', { text: t('palette.frames') }), this.list([{ item: { source: 'frame' as const, id: 'frame' }, name: t('frame.add'), kind: 'frame' }]));
+    this.root.append(el('h3', { text: t('palette.frames') }), this.list([
+      { item: { source: 'frame' as const, id: 'frame' }, name: t('frame.add'), kind: 'frame' },
+      { item: { source: 'note' as const, id: 'note' }, name: t('palette.note'), kind: 'note' },
+    ]));
 
     this.root.append(el('h3', { text: t('palette.standard') }), this.list(
       PRESETS.map((p) => ({ item: { source: 'preset' as const, id: p.id }, name: t(`preset.${p.id}` as MessageKey), kind: p.kind })),
@@ -49,8 +52,8 @@ export class Palette {
     const ul = el('ul', { className: 'palette-list' });
     for (const e of entries) {
       const icon =
-        e.kind === 'frame'
-          ? el('span', { text: '⬚', attrs: { 'aria-hidden': 'true' }, className: 'palette-glyph' })
+        e.kind === 'frame' || e.kind === 'note'
+          ? el('span', { text: e.kind === 'note' ? 'T' : '⬚', attrs: { 'aria-hidden': 'true' }, className: 'palette-glyph' })
           : el('img', { attrs: { src: iconDataUri(e.kind, this.getTheme().nodeStroke), width: '20', height: '20', alt: '' } });
       const btn = el(
         'button',

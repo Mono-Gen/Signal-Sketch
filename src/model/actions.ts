@@ -43,6 +43,8 @@ export interface ActionResult {
   /** 最初の警告(後方互換)。すべての警告は warnings */
   warning?: ActionWarning;
   warnings?: ActionWarning[];
+  /** 貼り付けで作ったメモのID */
+  createdNoteIds?: string[];
   /** 新しく作った機器のID(機器の追加のとき) */
   created?: string;
   /** 貼り付けで新しく作った機器・枠のID */

@@ -7,6 +7,7 @@ import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
 import type { PortRef, Side } from '../model/types';
 import type { DocumentStore } from '../state/store';
+import { DEFAULT_NOTE_FONT } from '../model/notes';
 import { escapeHtml } from '../util/escapeHtml';
 import { imageBox, isImageDataUri } from '../model/images';
 import { iconDataUri } from './icons';
@@ -19,9 +20,11 @@ import { anchorScrollDelta, clampZoom } from './zoom';
 /** 画面からモデルへの要求。画面は状態を持たず、操作はすべてここ経由でモデルへ戻す */
 export interface ViewCallbacks {
   /** 機器と枠の移動(枠を動かすと、中の機器も連れて動く。反映はモデル側) */
-  onMove(moves: { id: string; x: number; y: number }[], frameMoves: { id: string; x: number; y: number }[]): void;
+  onMove(moves: { id: string; x: number; y: number }[], frameMoves: { id: string; x: number; y: number }[], noteMoves: { id: string; x: number; y: number }[]): void;
   /** 枠の変形(ハンドル操作)。位置とサイズ */
   onFrameResize(frameId: string, rect: { x: number; y: number; w: number; h: number }): void;
+  /** メモの変形(ハンドル操作)。位置とサイズ */
+  onNoteResize(noteId: string, rect: { x: number; y: number; w: number; h: number }): void;
   /** 機器の変形(ハンドル操作)。位置とサイズ。fitImage は Shift を押していたか(画像の縦横比に合わせる) */
   onNodeResize(nodeId: string, rect: { x: number; y: number; w: number; h: number }, fitImage: boolean): void;
   onConnect(from: PortRef, to: PortRef): void;
@@ -65,6 +68,7 @@ export class DiagramView {
   private shiftAtRelease = false;
   private readonly edgeByCell = new Map<string, string>();
   private readonly frameByCell = new Map<string, string>();
+  private readonly noteByCell = new Map<string, string>();
   private readonly portLabels = new Map<string, string>();
   private rendering = false;
   private zoom = 1;
@@ -100,10 +104,11 @@ export class DiagramView {
   }
 
   /** 選択中の機器・接続のID(モデル側のID) */
-  getSelection(): { nodeIds: string[]; edgeIds: string[]; frameIds: string[] } {
+  getSelection(): { nodeIds: string[]; edgeIds: string[]; frameIds: string[]; noteIds: string[] } {
     const nodeIds: string[] = [];
     const edgeIds: string[] = [];
     const frameIds: string[] = [];
+    const noteIds: string[] = [];
     for (const c of this.graph.getSelectionCells()) {
       const id = c.getId() as string;
       const n = this.nodeByCell.get(id);
@@ -112,8 +117,10 @@ export class DiagramView {
       if (n) nodeIds.push(n);
       if (e) edgeIds.push(e);
       if (f) frameIds.push(f);
+      const m = this.noteByCell.get(id);
+      if (m) noteIds.push(m);
     }
-    return { nodeIds, edgeIds, frameIds };
+    return { nodeIds, edgeIds, frameIds, noteIds };
   }
 
   /** 画面の自動配線が決めた各接続の経路(端点を含む。SVG出力で使う)。接続ID → 点列 */
@@ -175,16 +182,16 @@ export class DiagramView {
   }
 
   /** 機器・枠・接続の選択を、まとめて置き換える(右クリックの前の選択を戻すのに使う。存在しないIDは無視する) */
-  setSelection(sel: { nodeIds: readonly string[]; edgeIds: readonly string[]; frameIds: readonly string[] }): void {
+  setSelection(sel: { nodeIds: readonly string[]; edgeIds: readonly string[]; frameIds: readonly string[]; noteIds?: readonly string[] }): void {
     const model = this.graph.getDataModel();
-    const ids = [...sel.nodeIds.map((id) => `n:${id}`), ...sel.frameIds.map((id) => `g:${id}`), ...sel.edgeIds.map((id) => `e:${id}`)];
+    const ids = [...sel.nodeIds.map((id) => `n:${id}`), ...sel.frameIds.map((id) => `g:${id}`), ...(sel.noteIds ?? []).map((id) => `t:${id}`), ...sel.edgeIds.map((id) => `e:${id}`)];
     this.graph.setSelectionCells(ids.map((id) => model.getCell(id)).filter((c): c is Cell => c != null));
   }
 
   /** 指定した機器・枠をまとめて選択する(貼り付けた直後の選択に使う) */
-  selectItems(nodeIds: readonly string[], frameIds: readonly string[]): void {
+  selectItems(nodeIds: readonly string[], frameIds: readonly string[], noteIds: readonly string[] = []): void {
     const model = this.graph.getDataModel();
-    const cells = [...nodeIds.map((id) => model.getCell(`n:${id}`)), ...frameIds.map((id) => model.getCell(`g:${id}`))].filter((c): c is Cell => Boolean(c));
+    const cells = [...nodeIds.map((id) => model.getCell(`n:${id}`)), ...frameIds.map((id) => model.getCell(`g:${id}`)), ...noteIds.map((id) => model.getCell(`t:${id}`))].filter((c): c is Cell => Boolean(c));
     this.graph.setSelectionCells(cells);
   }
 
@@ -197,6 +204,12 @@ export class DiagramView {
   /** 指定した枠を選択する(モデル側のID) */
   selectFrame(frameId: string): void {
     const cell = this.graph.getDataModel().getCell(`g:${frameId}`);
+    if (cell) this.graph.setSelectionCell(cell);
+  }
+
+  /** 指定したメモを選択する(モデル側のID) */
+  selectNote(noteId: string): void {
+    const cell = this.graph.getDataModel().getCell(`t:${noteId}`);
     if (cell) this.graph.setSelectionCell(cell);
   }
 
@@ -216,7 +229,7 @@ export class DiagramView {
   /** 機器・枠・線をすべて選択する */
   selectAll(): void {
     const model = this.graph.getDataModel();
-    const ids = [...this.nodeByCell.keys(), ...this.frameByCell.keys(), ...this.edgeByCell.keys()];
+    const ids = [...this.nodeByCell.keys(), ...this.frameByCell.keys(), ...this.noteByCell.keys(), ...this.edgeByCell.keys()];
     this.graph.setSelectionCells(ids.map((id) => model.getCell(id)).filter((c): c is Cell => c != null));
   }
 
@@ -276,12 +289,12 @@ export class DiagramView {
     // 動かせる・選べるのは機器と枠。ポート・アイコンは機器と一緒に扱う。変形できるのは枠だけ
     g.isCellMovable = (cell: Cell) => {
       const id = cell.getId() as string;
-      return this.nodeByCell.has(id) || this.frameByCell.has(id);
+      return this.nodeByCell.has(id) || this.frameByCell.has(id) || this.noteByCell.has(id);
     };
     // 枠は常に変形できる。機器は、1つだけ選んでいるときに変形できる(複数選択では、動かすだけ)。ポートやアイコンは変形しない
     g.isCellResizable = (cell: Cell) => {
       const id = cell.getId() as string;
-      return this.frameByCell.has(id) || (this.nodeByCell.has(id) && g.getSelectionCount() <= 1);
+      return this.frameByCell.has(id) || ((this.nodeByCell.has(id) || this.noteByCell.has(id)) && g.getSelectionCount() <= 1);
     };
     // maxGraph 標準は、Shift を押した変形で、最初の縦横比を固定する。機器では「画像の縦横比に合わせる」(名前の行と余白が固定なので、
     // 一定の比率にはならない)をモデルが決めるので、機器だけは標準の固定を使わない(Shift でも、ドラッグした大きさをそのまま渡す)。
@@ -307,7 +320,7 @@ export class DiagramView {
     this.container.addEventListener('pointerup', (ev) => (this.shiftAtRelease = ev.shiftKey), true);
     g.isCellSelectable = (cell: Cell) => {
       const id = cell.getId() as string;
-      return this.nodeByCell.has(id) || this.edgeByCell.has(id) || this.frameByCell.has(id);
+      return this.nodeByCell.has(id) || this.edgeByCell.has(id) || this.frameByCell.has(id) || this.noteByCell.has(id);
     };
     // maxGraph 標準のポップアップメニュー処理は、右ボタンを離したときに選択を変えてしまう(複数選択が子セル1つになる)。
     // 右クリックのメニューはアプリ側(ui/contextMenu)が出すので、標準の処理は止める
@@ -319,6 +332,7 @@ export class DiagramView {
       const cells = (evt.getProperty('cells') ?? []) as Cell[];
       const moves: { id: string; x: number; y: number }[] = [];
       const frameMoves: { id: string; x: number; y: number }[] = [];
+      const noteMoves: { id: string; x: number; y: number }[] = [];
       for (const c of cells) {
         const cellId = c.getId() as string;
         const geo = c.getGeometry();
@@ -327,9 +341,11 @@ export class DiagramView {
         const frameId = this.frameByCell.get(cellId);
         if (nodeId) moves.push({ id: nodeId, x: geo.x, y: geo.y });
         if (frameId) frameMoves.push({ id: frameId, x: geo.x, y: geo.y });
+        const noteId = this.noteByCell.get(cellId);
+        if (noteId) noteMoves.push({ id: noteId, x: geo.x, y: geo.y });
       }
       // イベント処理中に描き直さないよう、次のタスクでモデルへ反映する
-      if (moves.length > 0 || frameMoves.length > 0) setTimeout(() => this.callbacks.onMove(moves, frameMoves), 0);
+      if (moves.length > 0 || frameMoves.length > 0 || noteMoves.length > 0) setTimeout(() => this.callbacks.onMove(moves, frameMoves, noteMoves), 0);
     });
 
     g.addListener(InternalEvent.CELLS_RESIZED, (_sender: unknown, evt: EventObject) => {
@@ -342,6 +358,8 @@ export class DiagramView {
         const frameId = this.frameByCell.get(id);
         const nodeId = this.nodeByCell.get(id);
         const geo = c.getGeometry();
+        const noteId = this.noteByCell.get(id);
+        if (noteId && geo) setTimeout(() => this.callbacks.onNoteResize(noteId, { x: geo.x, y: geo.y, w: geo.width, h: geo.height }), 0);
         if (frameId && geo) setTimeout(() => this.callbacks.onFrameResize(frameId, { x: geo.x, y: geo.y, w: geo.width, h: geo.height }), 0);
         const model = nodeId ? this.store.doc.pages[0].nodes.find((n) => n.id === nodeId) : undefined;
         const unchanged = model && geo && model.x === geo.x && model.y === geo.y && model.w === geo.width && model.h === geo.height;
@@ -404,6 +422,7 @@ export class DiagramView {
         ...previous.nodeIds.map((id) => model.getCell(`n:${id}`)),
         ...previous.edgeIds.map((id) => model.getCell(`e:${id}`)),
         ...previous.frameIds.map((id) => model.getCell(`g:${id}`)),
+        ...previous.noteIds.map((id) => model.getCell(`t:${id}`)),
       ].filter((c): c is Cell => Boolean(c));
       this.graph.setSelectionCells(restore);
     } finally {
@@ -435,6 +454,7 @@ export class DiagramView {
       this.nodeByCell.clear();
       this.edgeByCell.clear();
       this.frameByCell.clear();
+      this.noteByCell.clear();
       this.portLabels.clear();
 
       const groupCells: Cell[] = [];
@@ -464,6 +484,33 @@ export class DiagramView {
         cell.setConnectable(false);
         this.frameByCell.set(`g:${grp.id}`, grp.id);
         groupCells.push(cell);
+      }
+
+      // メモ: 文字だけ(枠も背景もない)。つかめる範囲は、透明な塗りで確保する(塗りが無いと、文字のない所を押しても選べない)
+      for (const note of page.notes ?? []) {
+        const cell = g.insertVertex({
+          parent,
+          id: `t:${note.id}`,
+          value: escapeHtml(note.text).replace(/\n/g, '<br>'),
+          position: [note.x, note.y],
+          size: [note.w, note.h],
+          style: {
+            shape: 'rectangle',
+            fillColor: '#ffffff',
+            fillOpacity: 0,
+            strokeColor: 'none',
+            fontColor: note.color ?? th.nodeText,
+            fontSize: note.fontSize ?? DEFAULT_NOTE_FONT,
+            whiteSpace: 'wrap',
+            overflow: 'hidden',
+            align: 'left',
+            verticalAlign: 'top',
+            spacingLeft: 2,
+            spacingTop: 2,
+          },
+        });
+        cell.setConnectable(false);
+        this.noteByCell.set(`t:${note.id}`, note.id);
       }
 
       const markerSize = doc.grid.size * th.markerRatio;
@@ -629,7 +676,7 @@ export class DiagramView {
    * イベントの位置にある、モデル側の対象(機器・枠・接続)。ポートの上は、そのポートを持つ機器として返す。
    * 右クリックメニューが、何の上で開かれたかを知るために使う。何もなければ undefined。
    */
-  targetAt(ev: MouseEvent): { kind: 'node' | 'frame' | 'edge'; id: string } | undefined {
+  targetAt(ev: MouseEvent): { kind: 'node' | 'frame' | 'edge' | 'note'; id: string } | undefined {
     const model = this.graph.getDataModel();
     // 機器の中のアイコンなどの子セルに当たることがあるので、親をたどって機器・枠・接続を探す
     for (let cell: Cell | null | undefined = (() => { const id = this.cellIdAt(ev); return id ? model.getCell(id) : undefined; })(); cell; cell = cell.getParent()) {
@@ -638,6 +685,8 @@ export class DiagramView {
       if (node) return { kind: 'node', id: node };
       const frame = this.frameByCell.get(id);
       if (frame) return { kind: 'frame', id: frame };
+      const note = this.noteByCell.get(id);
+      if (note) return { kind: 'note', id: note };
       const edge = this.edgeByCell.get(id);
       if (edge) return { kind: 'edge', id: edge };
       const port = this.portInfo.get(id);

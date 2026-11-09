@@ -71,7 +71,7 @@
       background: var(--control-bg); color: var(--text); cursor: pointer;
     }
     button:hover:not(:disabled) { background: var(--control-hover); }
-    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     label.toggle { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
     /* 長い文でもツールバーを折り返させない(折り返すとキャンバスが跳ねる)。省略した全文は title に入る */
@@ -111,7 +111,8 @@
     .button-row button { padding: 4px 8px; }
     .field { display: grid; gap: 2px; }
     .field-label { font-size: 11px; color: var(--muted); }
-    .field input, .field select { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--control-bg); color: var(--text); width: 100%; }
+    .field input, .field select, .field textarea { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--control-bg); color: var(--text); width: 100%; }
+    .field textarea { resize: vertical; box-sizing: border-box; }
     #btn-checks[data-state="warn"] { color: var(--warn); border-color: var(--warn); }
     #btn-checks[data-state="error"] { color: var(--err); border-color: var(--err); }
     @keyframes issue-flash { from { box-shadow: 0 0 0 0 rgba(154, 103, 0, 0.7); } to { box-shadow: 0 0 0 10px rgba(154, 103, 0, 0); } }

@@ -163,6 +163,16 @@ Dashes and dots are working aids. SVG/PNG exports draw them as solid lines.
 - **Membership follows what you see**: a device belongs to a frame when its center is inside it. Move it in to join, out to leave; there is no join/leave operation. With nested frames, the inner frame is the one it belongs to.
 - Deleting a frame keeps the devices inside it.
 
+### Notes (text only)
+
+You can put text-only notes on the diagram (no frame, no background).
+
+- Under "Frames" on the left, click **Note (text only)** to add one, or drag it to where you want it. A new note contains the word "Note"; rewrite it in the **Text** field of the right panel (multiple lines, up to 1,000 characters).
+- In the panel you can change the **text color** (any color; "Match theme" restores the default), the **text size** (8-48; blank for the default), and the width and height. Choosing a color fixes it, so it does not change when you switch between light and dark.
+- Notes move by dragging, like devices, and the handles change the width at which the text wraps. Arrow keys, copy / paste / duplicate, the right-click menu, Delete and Undo all work. With two or more notes selected, color and text size can be changed together.
+- A note inside a frame (its center is inside the frame) moves with the frame and is copied with it.
+- Notes are included in the SVG and PNG exports (as real text in SVG). A page holds up to 100 notes. Notes cannot be connected with lines and are not part of the issues list.
+
 ## 8. Editing the legend (signal types)
 
 With nothing selected, the right panel edits the signal types.
@@ -224,7 +234,7 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 | Ctrl+wheel | Zoom around the mouse pointer |
 | Ctrl+`+` / Ctrl+`-` / Ctrl+0 | Zoom in / zoom out / back to 100% |
 | Ctrl+A | Select everything (devices, frames, lines) |
-| Arrow keys | Move the selected devices and frames by one grid step |
+| Arrow keys | Move the selected devices, frames and notes by one grid step |
 | Delete / Backspace | Delete the selected devices, lines and frames |
 | Right-click | Menu (copy, duplicate, delete, paste, select all; with two or more devices selected, also align and space evenly) |
 | Drag (a device handle, with a single device selected) | Resize it |

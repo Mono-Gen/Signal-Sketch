@@ -5,6 +5,7 @@ import type { Action, ActionResult } from './model/actions';
 import { createEmptyDocument } from './model/defaults';
 import { diagnose } from './model/diagnostics';
 import { addFrame, moveSelection } from './model/frames';
+import { addNote, moveNotes } from './model/noteActions';
 import { PRESETS, presetToTemplate } from './model/presets';
 import { getTemplate } from './model/query';
 import { removeTemplate } from './model/templateActions';
@@ -69,6 +70,14 @@ function addFromPalette(item: PaletteItem, at?: { x: number; y: number }): void 
     if (r.ok && r.created) {
       view.selectFrame(r.created);
       setStatus('ok', t('status.frameAdded'));
+    }
+    return;
+  }
+  if (item.source === 'note') {
+    const r = apply(addNote(PAGE_ID, at ?? { x: store.doc.grid.size * 4, y: store.doc.grid.size * 4 }));
+    if (r.ok && r.created) {
+      view.selectNote(r.created);
+      setStatus('ok', t('status.noteAdded'));
     }
     return;
   }
@@ -137,7 +146,7 @@ graphEl.addEventListener('drop', (ev) => {
   try {
     const item = JSON.parse(raw) as PaletteItem;
     const at = view.clientToGraph(ev.clientX, ev.clientY);
-    if (ev.shiftKey && item.source !== 'frame') void addRowFromPalette(item, at);
+    if (ev.shiftKey && item.source !== 'frame' && item.source !== 'note') void addRowFromPalette(item, at);
     else addFromPalette(item, at);
   } catch {
     setStatus('error', t('error.unknownTemplate')); // 想定外のデータが落とされた場合
@@ -249,11 +258,16 @@ const zoom = installZoomControls({
 function nudgeSelection(dx: number, dy: number): void {
   const sel = view.getSelection();
   const page = store.doc.pages.find((p) => p.id === PAGE_ID);
-  if (!page || (sel.nodeIds.length === 0 && sel.frameIds.length === 0)) return;
+  if (!page || (sel.nodeIds.length === 0 && sel.frameIds.length === 0 && sel.noteIds.length === 0)) return;
   const step = store.doc.grid.size;
   const nodeMoves = page.nodes.filter((n) => sel.nodeIds.includes(n.id)).map((n) => ({ id: n.id, x: n.x + dx * step, y: n.y + dy * step }));
   const frameMoves = page.groups.filter((g) => sel.frameIds.includes(g.id)).map((g) => ({ id: g.id, x: g.x + dx * step, y: g.y + dy * step }));
-  apply(moveSelection(PAGE_ID, nodeMoves, frameMoves));
+  const noteMoves = (page.notes ?? []).filter((m) => sel.noteIds.includes(m.id)).map((m) => ({ id: m.id, x: m.x + dx * step, y: m.y + dy * step }));
+  // 機器・枠とメモを1回の操作にする(元に戻すで一度に戻る)
+  apply((doc) => {
+    const r = moveSelection(PAGE_ID, nodeMoves, frameMoves)(doc);
+    return r.ok && noteMoves.length > 0 ? moveNotes(PAGE_ID, noteMoves)(doc) : r;
+  });
 }
 
 installShortcuts({

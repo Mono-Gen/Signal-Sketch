@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseDocument, serializeDocument } from '../../src/io/fileIo';
+import { buildSvg } from '../../src/io/svgExport';
 import { removeItems } from '../../src/model/actions';
+import { copySelection, pasteClipboard } from '../../src/model/clipboard';
+import { addFrame, moveSelection } from '../../src/model/frames';
 import { createEmptyDocument } from '../../src/model/defaults';
 import { addNote, moveNotes, resizeNote, updateNotes } from '../../src/model/noteActions';
 import { DEFAULT_NOTE_SIZE, MAX_NOTE_FONT, MAX_NOTE_LENGTH, MAX_NOTES_PER_PAGE, MIN_NOTE_FONT, MIN_NOTE_SIZE } from '../../src/model/notes';
@@ -175,5 +178,90 @@ describe('削除・保存・検査', () => {
       mutate(d);
       expect(validateDocument(d).ok, `ケース${i}`).toBe(false);
     }
+  });
+});
+
+describe('メモと他の機能の連携', () => {
+  it('SVG出力に、メモが本物の文字として入る(色・大きさ・特殊文字のエスケープ・折り返し)', () => {
+    const doc = fresh();
+    const id = addNote(P, { x: 40, y: 40 }, 'A<B>&"C"\n二行目')(doc).created!;
+    updateNotes(P, [id], { color: '#ff0000', fontSize: 20 })(doc);
+    const svg = buildSvg(doc, P, { edgePoints: new Map(), countText: (n) => `x${n}`, legendTitle: '凡例' });
+    expect(svg).toContain('fill="#ff0000"');
+    expect(svg).toContain('font-size="20"');
+    expect(svg).toContain('A&lt;B&gt;&amp;&quot;C&quot;');
+    expect(svg).toContain('二行目');
+    expect(svg).not.toContain('A<B>');
+    expect((svg.match(/<tspan/g) ?? []).length).toBe(2);
+  });
+
+  it('幅が狭いと、SVGでも折り返す。高さに収まらない行は出さない', () => {
+    const doc = fresh();
+    const id = addNote(P, { x: 0, y: 0 }, 'あ'.repeat(30))(doc).created!;
+    resizeNote(P, id, { x: 0, y: 0, w: 100, h: 60 })(doc);
+    const svg = buildSvg(doc, P, { edgePoints: new Map(), countText: (n) => `x${n}`, legendTitle: '凡例' });
+    const lines = (svg.match(/<tspan/g) ?? []).length;
+    expect(lines).toBeGreaterThan(1); // 100px 幅に全角30文字(14px)は1行に入らない
+    expect(lines).toBeLessThanOrEqual(Math.floor(58 / (14 * 1.25))); // 高さ60に収まる行数まで
+  });
+
+  it('コピー&貼り付けで、メモ(本文・色)が複製され、IDは新しく、位置はずれる', () => {
+    const doc = fresh();
+    const id = addNote(P, { x: 100, y: 100 }, '複製')(doc).created!;
+    updateNotes(P, [id], { color: '#123456' })(doc);
+    const data = copySelection(doc, P, { noteIds: [id] })!;
+    expect(data.notes).toHaveLength(1);
+    const r = pasteClipboard(P, data, { dx: 20, dy: 20 })(doc);
+    expect(r.ok).toBe(true);
+    expect(r.createdNoteIds).toHaveLength(1);
+    const copy = notes(doc).find((n) => n.id === r.createdNoteIds![0])!;
+    expect(copy).toMatchObject({ text: '複製', color: '#123456', x: 120, y: 120 });
+    expect(copy.id).not.toBe(id);
+  });
+
+  it('メモだけを選んだときも、コピーできる(空の選択は null のまま)', () => {
+    const doc = fresh();
+    expect(copySelection(doc, P, { noteIds: ['nope'] })).toBeNull();
+  });
+
+  it('貼り付けで上限(100個)を超えるなら断り、何も変わらない', () => {
+    const doc = fresh();
+    for (let i = 0; i < MAX_NOTES_PER_PAGE; i++) addNote(P, { x: 0, y: 0 })(doc);
+    const data = copySelection(doc, P, { noteIds: [notes(doc)[0].id] })!;
+    const store = new DocumentStore(doc);
+    expect(store.apply(pasteClipboard(P, data, { dx: 20, dy: 20 }))).toMatchObject({ ok: false, error: 'too-many-notes' });
+    expect(notes(store.doc)).toHaveLength(MAX_NOTES_PER_PAGE);
+  });
+
+  it('枠を選んでコピーすると、枠の中のメモも入る。外のメモは入らない', () => {
+    const doc = fresh();
+    const frame = addFrame(P, '枠', { x: 100, y: 100 })(doc).created!;
+    const inside = addNote(P, { x: 120, y: 120 }, '中')(doc).created!;
+    const f = doc.pages[0].groups.find((g) => g.id === frame)!;
+    const outside = addNote(P, { x: f.x + f.w + 300, y: 400 }, '外')(doc).created!;
+    const data = copySelection(doc, P, { frameIds: [frame] })!;
+    expect(data.notes!.map((n) => n.id)).toEqual([inside]);
+    expect(data.notes!.some((n) => n.id === outside)).toBe(false);
+  });
+
+  it('枠を動かすと、枠の中のメモも同じだけ動く。外のメモは動かない', () => {
+    const doc = fresh();
+    const frame = addFrame(P, '枠', { x: 100, y: 100 })(doc).created!;
+    const f = doc.pages[0].groups.find((g) => g.id === frame)!;
+    const inside = addNote(P, { x: f.x + 20, y: f.y + 20 }, '中')(doc).created!;
+    const outside = addNote(P, { x: f.x + f.w + 300, y: 500 }, '外')(doc).created!;
+    const before = Object.fromEntries(notes(doc).map((n) => [n.id, [n.x, n.y]]));
+    expect(moveSelection(P, [], [{ id: frame, x: f.x + 50, y: f.y + 30 }])(doc).ok).toBe(true);
+    const byId = (id: string) => notes(doc).find((n) => n.id === id)!;
+    expect([byId(inside).x, byId(inside).y]).toEqual([before[inside][0] + 50, before[inside][1] + 30]);
+    expect([byId(outside).x, byId(outside).y]).toEqual(before[outside]);
+  });
+
+  it('メモを含む図は、古いコピーデータ(notes なし)も貼れる', () => {
+    const doc = fresh();
+    const frame = addFrame(P, '枠', { x: 100, y: 100 })(doc).created!;
+    const data = copySelection(doc, P, { frameIds: [frame] })!;
+    delete data.notes;
+    expect(pasteClipboard(P, data, { dx: 20, dy: 20 })(doc).ok).toBe(true);
   });
 });

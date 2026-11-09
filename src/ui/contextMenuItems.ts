@@ -28,7 +28,7 @@ export type MenuItem =
 
 export interface MenuContext {
   /** 選択中の数(機器・枠・線) */
-  selected: { nodes: number; frames: number; edges: number };
+  selected: { nodes: number; frames: number; edges: number; notes?: number };
   /** 貼り付ける内容があるか */
   canPaste: boolean;
   /** 修飾キーの表記(Windows は「Ctrl」、Mac は「⌘」) */
@@ -48,7 +48,8 @@ const SEPARATOR: MenuItem = { kind: 'separator' };
  */
 export function buildMenuItems(ctx: MenuContext): MenuItem[] {
   const { nodes, frames, edges } = ctx.selected;
-  const total = nodes + frames + edges;
+  const notes = ctx.selected.notes ?? 0;
+  const total = nodes + frames + edges + notes;
   const key = (letter: string) => `${ctx.modKey}+${letter}`;
 
   if (total === 0) {
@@ -59,7 +60,7 @@ export function buildMenuItems(ctx: MenuContext): MenuItem[] {
     ];
   }
 
-  const copyable = nodes + frames > 0;
+  const copyable = nodes + frames + notes > 0;
   const items: MenuItem[] = [
     { kind: 'item', command: { type: 'copy' }, labelKey: 'menu.copy', shortcut: key('C'), disabled: !copyable, reasonKey: 'status.nothingToCopy' },
     { kind: 'item', command: { type: 'duplicate' }, labelKey: 'menu.duplicate', shortcut: key('D'), disabled: !copyable, reasonKey: 'status.nothingToCopy' },

@@ -3,7 +3,8 @@ import { getNodePorts, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
 import { markerSpec } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
-import type { DiagramDocument, DiagramNode } from '../model/types';
+import { DEFAULT_NOTE_FONT } from '../model/notes';
+import type { DiagramDocument, DiagramNode, DiagramNote } from '../model/types';
 import { escapeHtml } from '../util/escapeHtml';
 import { iconSvgGroup } from '../view/icons';
 import { FLAT_THEME } from '../view/theme';
@@ -161,6 +162,39 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
   return `<g>${parts.join('')}</g>`;
 }
 
+/** 文字1つの幅の目安(全角は文字の大きさと同じ、半角は約0.55倍)。SVG は自動で折り返さないため、メモの折り返しに使う */
+const charWidth = (ch: string, size: number): number => (/[\u0000-\u00ff\uff61-\uff9f]/.test(ch) ? size * 0.55 : size);
+
+/** メモ。文字だけ(枠も背景もない)。箱の幅で折り返し、高さに収まらない行は出さない(画面と同じ) */
+function noteSvg(n: DiagramNote, th: Theme): string {
+  const size = n.fontSize ?? DEFAULT_NOTE_FONT;
+  const lineHeight = size * 1.25;
+  const maxWidth = Math.max(n.w - 4, size);
+  const lines: string[] = [];
+  for (const raw of n.text.split('\n')) {
+    let line = '';
+    let width = 0;
+    for (const ch of raw) {
+      const cw = charWidth(ch, size);
+      if (width + cw > maxWidth && line !== '') {
+        lines.push(line);
+        line = '';
+        width = 0;
+      }
+      line += ch;
+      width += cw;
+    }
+    lines.push(line);
+  }
+  const fit = Math.max(1, Math.floor((n.h - 2) / lineHeight));
+  const x = n.x + 2;
+  const spans = lines
+    .slice(0, fit)
+    .map((l, i) => `<tspan x="${num(x)}" y="${num(n.y + 2 + size + i * lineHeight)}">${esc(l)}</tspan>`)
+    .join('');
+  return `<text font-size="${size}" fill="${esc(n.color ?? th.nodeText)}">${spans}</text>`;
+}
+
 /** 凡例(信号の種類と線の色)。図だけを貼っても、色の意味が伝わるように含める */
 function legendSvg(doc: DiagramDocument, y: number, opts: SvgExportOptions, th: Theme): string {
   const items: string[] = [`<text x="12" y="${num(y + 24)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(opts.legendTitle)}</text>`];
@@ -209,12 +243,14 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
   }
 
   const nodes = page.nodes.map((n, i) => nodeSvg(doc, n, i, connected, opts, th));
+  const notes = (page.notes ?? []).map((n) => noteSvg(n, th));
 
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family='${FONT}'>`,
     `<rect width="${w}" height="${h}" fill="#ffffff"/>`,
     ...frames,
+    ...notes,
     ...edges,
     ...nodes,
     legendSvg(doc, page.size.h, opts, th),

@@ -48,8 +48,8 @@ export function createClipboardCommands(deps: ClipboardCommandsDeps): ClipboardC
   function pasteData(data: ClipboardData, step: number): void {
     const r = apply(pasteClipboard(pageId, data, suggestPasteOffset(store.doc, pageId, data, step)));
     if (!r.ok) return;
-    view.selectItems(r.createdNodeIds ?? [], r.createdFrameIds ?? []);
-    setStatus('ok', t('status.pasted', { count: (r.createdNodeIds?.length ?? 0) + (r.createdFrameIds?.length ?? 0) }));
+    view.selectItems(r.createdNodeIds ?? [], r.createdFrameIds ?? [], r.createdNoteIds ?? []);
+    setStatus('ok', t('status.pasted', { count: (r.createdNodeIds?.length ?? 0) + (r.createdFrameIds?.length ?? 0) + (r.createdNoteIds?.length ?? 0) }));
   }
 
   return {
@@ -75,7 +75,7 @@ export function createClipboardCommands(deps: ClipboardCommandsDeps): ClipboardC
     },
     deleteSelection() {
       const sel = view.getSelection();
-      if (sel.nodeIds.length === 0 && sel.edgeIds.length === 0 && sel.frameIds.length === 0) return;
+      if (sel.nodeIds.length === 0 && sel.edgeIds.length === 0 && sel.frameIds.length === 0 && sel.noteIds.length === 0) return;
       store.apply(removeItems(pageId, sel));
     },
   };

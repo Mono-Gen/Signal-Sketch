@@ -4,6 +4,7 @@ import { addEdge, addEdges, movePort } from '../model/actions';
 import { resizeNodeRect } from '../model/imageActions';
 import type { Action, ActionResult } from '../model/actions';
 import { moveSelection, resizeFrame } from '../model/frames';
+import { moveNotes, resizeNote } from '../model/noteActions';
 import type { DiagramView, ViewCallbacks } from '../view/diagramView';
 import type { PropertiesPanel } from './propertiesPanel';
 import type { SetStatus } from './statusBar';
@@ -30,12 +31,20 @@ export function createViewCallbacks(deps: ViewCallbacksDeps): ViewCallbacks {
   let portsHint: string | null = null;
 
   return {
-    onMove(moves, frameMoves) {
-      if (!apply(moveSelection(pageId, moves, frameMoves)).ok) deps.getView().render(); // 失敗した場合は、画面の位置をモデルに合わせて戻す
+    onMove(moves, frameMoves, noteMoves) {
+      // 機器・枠とメモを1回の操作にする(元に戻すで一度に戻る)。どちらかが失敗したら全体を取り消す
+      const action: Action = (doc) => {
+        const r = moveSelection(pageId, moves, frameMoves)(doc);
+        return r.ok && noteMoves.length > 0 ? moveNotes(pageId, noteMoves)(doc) : r;
+      };
+      if (!apply(action).ok) deps.getView().render(); // 失敗した場合は、画面の位置をモデルに合わせて戻す
     },
     onNodeResize(nodeId, rect, fitImage) {
       // 最小より小さい・ページの外などは、モデルが補正して反映する。失敗した場合は、画面の大きさをモデルに合わせて戻す
       if (!apply(resizeNodeRect(pageId, nodeId, rect, { fitImage })).ok) deps.getView().render();
+    },
+    onNoteResize(noteId, rect) {
+      if (!apply(resizeNote(pageId, noteId, rect)).ok) deps.getView().render(); // 失敗時は元の大きさへ戻す
     },
     onFrameResize(frameId, rect) {
       if (!apply(resizeFrame(pageId, frameId, rect)).ok) deps.getView().render(); // 小さすぎる等は元の大きさへ戻す
@@ -81,9 +90,10 @@ export function createViewCallbacks(deps: ViewCallbacksDeps): ViewCallbacks {
       const view = deps.getView();
       const panel = deps.getPanel();
       const sel = view.getSelection();
-      const total = sel.nodeIds.length + sel.edgeIds.length + sel.frameIds.length;
+      const total = sel.nodeIds.length + sel.edgeIds.length + sel.frameIds.length + sel.noteIds.length;
       const onlyOne = total === 1;
-      if (total >= 2) panel.updateMulti(total, sel.nodeIds);
+      if (sel.noteIds.length > 0 && sel.noteIds.length === total) panel.updateNotes(sel.noteIds);
+      else if (total >= 2) panel.updateMulti(total, sel.nodeIds);
       else if (onlyOne && sel.frameIds.length === 1) panel.updateFrame(sel.frameIds[0]);
       else panel.update(onlyOne && sel.nodeIds.length === 1 ? sel.nodeIds[0] : null);
     },

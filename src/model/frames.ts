@@ -148,6 +148,17 @@ export function moveSelection(
       }
     }
 
+    // 枠の中にあるメモも、枠といっしょに動く(中の機器と同じ考え方。メモ自身を動かす指定は、あとで moveNotes が絶対位置で上書きする)
+    for (const m of frameMoves) {
+      const frame = page.groups.find((x) => x.id === m.id)!;
+      const d = { dx: s(m.x) - frame.x, dy: s(m.y) - frame.y };
+      for (const note of page.notes ?? []) {
+        if (!centerInside(note, frame)) continue;
+        note.x = Math.max(0, Math.min(note.x + d.dx, page.size.w - note.w));
+        note.y = Math.max(0, Math.min(note.y + d.dy, page.size.h - note.h));
+      }
+    }
+
     for (const [id, d] of nodeShift) {
       const n = page.nodes.find((x) => x.id === id)!;
       n.x += d.dx;

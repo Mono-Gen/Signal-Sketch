@@ -16,6 +16,8 @@ import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
 import { registerTemplate } from '../model/templateActions';
 import { resizeNodes, setPortGroupsMany, updateNodes } from '../model/bulkActions';
+import { resizeNote, updateNotes } from '../model/noteActions';
+import { DEFAULT_NOTE_FONT, MAX_NOTE_FONT, MAX_NOTE_LENGTH, MIN_NOTE_FONT } from '../model/notes';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 import { askRegistrationName } from './registerDeviceDialog';
@@ -120,6 +122,95 @@ export class PropertiesPanel {
    */
   updateMulti(count: number, nodeIds: readonly string[] = []): void {
     this.refresh(() => this.renderNode(null, t('props.multi', { count }), nodeIds));
+  }
+
+  /** メモだけを選んでいるとき(1つ以上): 本文(1つのときだけ)・文字色・文字の大きさ・大きさ */
+  updateNotes(noteIds: readonly string[]): void {
+    this.refresh(() => this.renderNotes(noteIds));
+  }
+
+  private renderNotes(noteIds: readonly string[]): void {
+    this.root.replaceChildren(el('h2', { text: t('props.title') }));
+    const doc = this.ctx.getDoc();
+    const page = getPage(doc, this.ctx.pageId);
+    const notes = (page?.notes ?? []).filter((n) => noteIds.includes(n.id));
+    if (notes.length === 0) {
+      this.root.append(el('p', { className: 'hint', text: t('props.empty') }), this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
+      return;
+    }
+    const ids = notes.map((n) => n.id);
+    const back = () => this.updateNotes(ids);
+    const section = el('div', { className: 'section', attrs: { 'data-section': 'note' } }, [el('h3', { text: t('note.title') })]);
+    if (notes.length > 1) section.append(el('p', { className: 'hint', text: t('note.multi', { count: notes.length }) }));
+    else {
+      const area = el('textarea', {
+        attrs: { rows: '4', maxlength: String(MAX_NOTE_LENGTH), 'data-prop': 'note-text' },
+        on: {
+          change: (ev) => {
+            if (!this.ctx.apply(updateNotes(this.ctx.pageId, ids, { text: (ev.target as HTMLTextAreaElement).value })).ok) back();
+          },
+        },
+      });
+      area.value = notes[0].text;
+      section.append(field(t('note.text'), area));
+    }
+    const colors = new Set(notes.map((n) => n.color ?? ''));
+    const color = el('input', {
+      className: 'color-input',
+      attrs: { type: 'color', value: colors.size === 1 && notes[0].color ? notes[0].color : '#000000', 'aria-label': t('note.color'), 'data-prop': 'note-color' },
+      on: {
+        change: (ev) => {
+          if (!this.ctx.apply(updateNotes(this.ctx.pageId, ids, { color: (ev.target as HTMLInputElement).value })).ok) back();
+        },
+      },
+    });
+    const reset = el('button', {
+      text: t('note.colorReset'),
+      attrs: { type: 'button', 'data-action': 'note-color-reset' },
+      on: {
+        click: () => {
+          this.ctx.apply(updateNotes(this.ctx.pageId, ids, { color: null }));
+          back();
+        },
+      },
+    });
+    section.append(field(t('note.color'), el('div', { className: 'signal-row' }, [color, reset])), el('p', { className: 'hint', text: t('note.colorHint') }));
+    const sizes = new Set(notes.map((n) => n.fontSize ?? DEFAULT_NOTE_FONT));
+    const fontSize = el('input', {
+      attrs: {
+        type: 'number',
+        min: String(MIN_NOTE_FONT),
+        max: String(MAX_NOTE_FONT),
+        step: '1',
+        value: notes.some((n) => n.fontSize !== undefined) && sizes.size === 1 ? String([...sizes][0]) : '',
+        placeholder: sizes.size > 1 ? t('props.mixed') : String(DEFAULT_NOTE_FONT),
+        'data-prop': 'note-font',
+      },
+      on: {
+        change: (ev) => {
+          const raw = (ev.target as HTMLInputElement).value.trim();
+          const r = this.ctx.apply(updateNotes(this.ctx.pageId, ids, { fontSize: raw === '' ? null : Number(raw) }));
+          if (!r.ok) back();
+        },
+      },
+    });
+    section.append(field(t('note.fontSize'), fontSize), el('p', { className: 'hint', text: t('note.fontSizeHint') }));
+    if (notes.length === 1) {
+      const n = notes[0];
+      const dim = (prop: 'w' | 'h', dataProp: string) =>
+        el('input', {
+          attrs: { type: 'number', min: '1', step: doc.grid.enabled ? String(doc.grid.size) : '1', value: String(Math.round(n[prop])), 'data-prop': dataProp },
+          on: {
+            change: (ev) => {
+              const raw = (ev.target as HTMLInputElement).value.trim();
+              if (raw !== '') this.ctx.apply(resizeNote(this.ctx.pageId, n.id, { x: n.x, y: n.y, w: n.w, h: n.h, [prop]: Number(raw) }));
+              back();
+            },
+          },
+        });
+      section.append(el('div', { className: 'size-row' }, [field(t('props.width'), dim('w', 'note-width')), field(t('props.height'), dim('h', 'note-height'))]));
+    }
+    this.root.append(section, this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
   }
 
   private renderNode(nodeId: string | null, emptyHint: string = t('props.empty'), alignIds: readonly string[] = []): void {

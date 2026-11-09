@@ -189,7 +189,7 @@ export function installContextMenu(deps: ContextMenuDeps): void {
     const pressed = atPress;
     atPress = null;
     const inPressed = (t: NonNullable<typeof target>): boolean =>
-      pressed !== null && (t.kind === 'node' ? pressed.nodeIds : t.kind === 'frame' ? pressed.frameIds : pressed.edgeIds).includes(t.id);
+      pressed !== null && (t.kind === 'node' ? pressed.nodeIds : t.kind === 'frame' ? pressed.frameIds : t.kind === 'note' ? (pressed.noteIds ?? []) : pressed.edgeIds).includes(t.id);
     // 押す前から選ばれていたものの上なら、その選択を戻す(複数のまま開く)
     if (target && pressed && inPressed(target)) view.setSelection(pressed);
     const before = view.getSelection();
@@ -199,6 +199,8 @@ export function installContextMenu(deps: ContextMenuDeps): void {
       view.selectNode(target.id);
     } else if (target.kind === 'frame' && !before.frameIds.includes(target.id)) {
       view.selectFrame(target.id);
+    } else if (target.kind === 'note' && !before.noteIds.includes(target.id)) {
+      view.selectNote(target.id);
     } else if (target.kind === 'edge' && !before.edgeIds.includes(target.id)) {
       view.selectEdge(target.id);
     }
@@ -206,7 +208,7 @@ export function installContextMenu(deps: ContextMenuDeps): void {
     showContextMenu({
       x: ev.clientX,
       y: ev.clientY,
-      items: buildMenuItems({ selected: { nodes: sel.nodeIds.length, frames: sel.frameIds.length, edges: sel.edgeIds.length }, canPaste: clipboard.canPaste(), modKey }),
+      items: buildMenuItems({ selected: { nodes: sel.nodeIds.length, frames: sel.frameIds.length, edges: sel.edgeIds.length, notes: sel.noteIds.length }, canPaste: clipboard.canPaste(), modKey }),
       onCommand: execute,
     });
   });

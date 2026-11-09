@@ -2,9 +2,10 @@ import type { Action, ActionResult } from './actions';
 import { assetsIssue } from './images';
 import { snap } from './grid';
 import { uniqueId } from './ids';
+import { MAX_NOTES_PER_PAGE } from './notes';
 import { getPage } from './query';
 import { isCustomTemplateId, MAX_TEMPLATES } from './templateActions';
-import type { DeviceTemplate, DiagramDocument, DiagramEdge, DiagramGroup, DiagramNode, SignalType } from './types';
+import type { DeviceTemplate, DiagramDocument, DiagramEdge, DiagramGroup, DiagramNode, DiagramNote, SignalType } from './types';
 
 // コピー&貼り付け。選んだ機器・枠を、アプリのデータとして複製する。
 // (描画ライブラリ標準の Ctrl+ドラッグ複製は、データに入らず選択も削除もできないため使わない)
@@ -13,6 +14,8 @@ import type { DeviceTemplate, DiagramDocument, DiagramEdge, DiagramGroup, Diagra
 export interface ClipboardData {
   nodes: DiagramNode[];
   frames: DiagramGroup[];
+  /** コピーしたメモ(古い内容には無い) */
+  notes?: DiagramNote[];
   /** コピーした機器どうしの接続(片方でも外にある接続は含めない。1ポート1本のため) */
   edges: DiagramEdge[];
   templates: DeviceTemplate[];
@@ -43,21 +46,24 @@ const centerInside = (inner: Rect, frame: Rect): boolean => {
 export function copySelection(
   doc: DiagramDocument,
   pageId: string,
-  selection: { nodeIds?: readonly string[]; frameIds?: readonly string[] },
+  selection: { nodeIds?: readonly string[]; frameIds?: readonly string[]; noteIds?: readonly string[] },
 ): ClipboardData | null {
   const page = getPage(doc, pageId);
   if (!page) return null;
   const nodeIds = new Set(selection.nodeIds ?? []);
   const frameIds = new Set(selection.frameIds ?? []);
+  const noteIds = new Set(selection.noteIds ?? []);
   for (const fid of [...frameIds]) {
     const frame = page.groups.find((g) => g.id === fid);
     if (!frame) continue;
+    for (const m of page.notes ?? []) if (centerInside(m, frame)) noteIds.add(m.id);
     for (const n of page.nodes) if (centerInside(n, frame)) nodeIds.add(n.id);
     for (const g of page.groups) if (g.id !== fid && centerInside(g, frame)) frameIds.add(g.id);
   }
   const nodes = page.nodes.filter((n) => nodeIds.has(n.id));
   const frames = page.groups.filter((g) => frameIds.has(g.id));
-  if (nodes.length === 0 && frames.length === 0) return null;
+  const notes = (page.notes ?? []).filter((m) => noteIds.has(m.id));
+  if (nodes.length === 0 && frames.length === 0 && notes.length === 0) return null;
 
   const copiedNodeIds = new Set(nodes.map((n) => n.id));
   const edges = page.edges.filter((e) => copiedNodeIds.has(e.from.nodeId) && copiedNodeIds.has(e.to.nodeId));
@@ -75,7 +81,7 @@ export function copySelection(
     [...assetIds].filter((id) => doc.assets?.[id] !== undefined).map((id) => [id, doc.assets![id]]),
   );
 
-  return structuredClone({ nodes, frames, edges, templates, signalTypes, assets });
+  return structuredClone({ nodes, frames, notes, edges, templates, signalTypes, assets });
 }
 
 function sameSize(a: DeviceTemplate['size'], b: DeviceTemplate['size']): boolean {
@@ -138,7 +144,7 @@ export function suggestPasteOffset(doc: DiagramDocument, pageId: string, data: C
   const small = step * PASTE_STEP_GRID * g;
   const page = getPage(doc, pageId);
   if (!page || data.frames.length === 0) return { dx: small, dy: small };
-  const all: Rect[] = [...data.nodes, ...data.frames];
+  const all: Rect[] = [...data.nodes, ...data.frames, ...(data.notes ?? [])];
   const minX = Math.min(...all.map((r) => r.x));
   const minY = Math.min(...all.map((r) => r.y));
   const maxX = Math.max(...all.map((r) => r.x + r.w));
@@ -184,7 +190,9 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
   return (doc): ActionResult => {
     const page = getPage(doc, pageId);
     if (!page) return { ok: false, error: 'unknown-page' };
-    if (data.nodes.length === 0 && data.frames.length === 0) return { ok: false, error: 'invalid-value' };
+    const dataNotes = data.notes ?? [];
+    if (data.nodes.length === 0 && data.frames.length === 0 && dataNotes.length === 0) return { ok: false, error: 'invalid-value' };
+    if ((page.notes?.length ?? 0) + dataNotes.length > MAX_NOTES_PER_PAGE) return { ok: false, error: 'too-many-notes' };
     // NaN/Infinity が座標に入ると保存後に読み込めない図になるため、ずらし量は有限値に限る。
     if (!Number.isFinite(offset.dx) || !Number.isFinite(offset.dy)) return { ok: false, error: 'invalid-value' };
 
@@ -240,7 +248,7 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     const g = doc.grid.size;
     const s = (v: number) => (doc.grid.enabled ? snap(v, g) : v);
     // ページの外へ出ないよう、全体の外接矩形が収まる範囲へ、ずらし量を丸める
-    const all: Rect[] = [...data.nodes, ...data.frames];
+    const all: Rect[] = [...data.nodes, ...data.frames, ...dataNotes];
     const minX = Math.min(...all.map((r) => r.x));
     const minY = Math.min(...all.map((r) => r.y));
     const maxX = Math.max(...all.map((r) => r.x + r.w));
@@ -275,6 +283,13 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
       page.groups.push({ ...f, id, x: f.x + dx, y: f.y + dy });
       createdFrameIds.push(id);
     }
+    const createdNoteIds: string[] = [];
+    for (const m of structuredClone(dataNotes)) {
+      const notes = (page.notes ??= []);
+      const id = uniqueId('note', notes.map((x) => x.id));
+      notes.push({ ...m, id, x: m.x + dx, y: m.y + dy });
+      createdNoteIds.push(id);
+    }
     for (const e of structuredClone(data.edges)) {
       const from = nodeIdMap.get(e.from.nodeId);
       const to = nodeIdMap.get(e.to.nodeId);
@@ -286,6 +301,6 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
         to: { ...e.to, nodeId: to },
       });
     }
-    return { ok: true, createdNodeIds, createdFrameIds };
+    return { ok: true, createdNodeIds, createdFrameIds, createdNoteIds };
   };
 }
