@@ -125,6 +125,7 @@ export function moveSelection(
   return (doc) => {
     const page = getPage(doc, pageId);
     if (!page) return fail('unknown-page');
+    for (const m of [...nodeMoves, ...frameMoves]) if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return fail('invalid-value');
     for (const m of nodeMoves) if (!page.nodes.some((n) => n.id === m.id)) return fail('unknown-node');
     for (const m of frameMoves) if (!page.groups.some((x) => x.id === m.id)) return fail('unknown-frame');
 

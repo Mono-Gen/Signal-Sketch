@@ -118,6 +118,7 @@ const en: Record<MessageKey, string> = {
   'check.legend': 'Dashed: input-to-input or output-to-output / Dotted: different signal types',
   'error.unknownFrame': 'Frame not found',
   'error.unknownNote': 'Note not found',
+  'error.unknownEdge': 'Line not found',
   'error.tooManyNotes': 'A page can hold up to 100 notes',
   'palette.frames': 'Frames',
   'frame.default': 'New frame',

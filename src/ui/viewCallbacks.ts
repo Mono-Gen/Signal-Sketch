@@ -5,6 +5,7 @@ import { resizeNodeRect } from '../model/imageActions';
 import type { Action, ActionResult } from '../model/actions';
 import { moveSelection, resizeFrame } from '../model/frames';
 import { moveNotes, resizeNote } from '../model/noteActions';
+import { setEdgeWaypoints } from '../model/waypoints';
 import type { DiagramView, ViewCallbacks } from '../view/diagramView';
 import type { PropertiesPanel } from './propertiesPanel';
 import type { SetStatus } from './statusBar';
@@ -42,6 +43,10 @@ export function createViewCallbacks(deps: ViewCallbacksDeps): ViewCallbacks {
     onNodeResize(nodeId, rect, fitImage) {
       // 最小より小さい・ページの外などは、モデルが補正して反映する。失敗した場合は、画面の大きさをモデルに合わせて戻す
       if (!apply(resizeNodeRect(pageId, nodeId, rect, { fitImage })).ok) deps.getView().render();
+    },
+    onEdgeRoute(edgeId, points) {
+      // 手で引き直した線の経路を保存する(元に戻すで戻る)。失敗した場合は、画面をモデルに合わせて戻す
+      if (!apply(setEdgeWaypoints(pageId, edgeId, points)).ok) deps.getView().render();
     },
     onNoteResize(noteId, rect) {
       if (!apply(resizeNote(pageId, noteId, rect)).ok) deps.getView().render(); // 失敗時は元の大きさへ戻す

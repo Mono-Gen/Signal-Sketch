@@ -294,11 +294,12 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
       const from = nodeIdMap.get(e.from.nodeId);
       const to = nodeIdMap.get(e.to.nodeId);
       if (!from || !to) continue; // コピーに含まれない機器への接続は作らない
-      // 手動の経路(waypoints)は、ずらした位置と合わないため引き継がない
       page.edges.push({
         id: uniqueId('e', page.edges.map((x) => x.id)),
         from: { ...e.from, nodeId: from },
         to: { ...e.to, nodeId: to },
+        // 手動の経路は、機器と同じだけずらして引き継ぐ(両端の機器が一緒にコピーされた線だけがここへ来る)
+        ...(e.waypoints && e.waypoints.length > 0 ? { waypoints: e.waypoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } : {}),
       });
     }
     return { ok: true, createdNodeIds, createdFrameIds, createdNoteIds };

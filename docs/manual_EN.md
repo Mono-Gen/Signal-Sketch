@@ -128,6 +128,7 @@ Select a device and the "Ports" section lists its port **groups**. Each group ha
 - Hovering over a port shows a soft ring in the signal color around it.
 - You cannot connect a port to itself, or repeat an existing connection. The reason is shown at the top right for a few seconds.
 - Select a line and use "Delete" (or the Delete key) to remove it. Deleting a device also removes its lines.
+- Lines are routed automatically when you connect them. Select a line and drag its **handle** (in the middle of a segment) to **reroute it by hand**. The route you draw is remembered: it stays after you save and reopen the file and after other operations redraw the diagram (and Undo reverts it). When both end devices move together (a whole frame, or a multi-selection), the route moves with them. If **only one end** moves, or the size or ports change so that an end's position changes, the old route no longer fits, so that line goes back to automatic routing (reroute it again).
 - A line's color follows the signal type of its output-side port.
 
 ### Connecting many ports at once

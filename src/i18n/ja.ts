@@ -117,6 +117,7 @@ const ja = {
   'check.legend': '破線: 入力同士・出力同士 / 点線: 信号の種類が異なる',
   'error.unknownFrame': '枠が見つかりません',
   'error.unknownNote': 'メモが見つかりません',
+  'error.unknownEdge': '線が見つかりません',
   'error.tooManyNotes': 'メモは1ページに100個までです',
   'error.pageTooSmall': 'ページの外へはみ出す機器・枠があるため、この大きさにはできません: {names}',
   'list.separator': '、',

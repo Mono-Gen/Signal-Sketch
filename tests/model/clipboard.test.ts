@@ -163,12 +163,20 @@ describe('pasteClipboard', () => {
     expect(doc.pages[0].edges.some((e) => e.from.nodeId === newId || e.to.nodeId === newId)).toBe(false);
   });
 
-  it('手動の経路(waypoints)は引き継がない', () => {
+  it('手動の経路(waypoints)は、機器と同じだけずらして引き継ぐ(元の線の経路は変わらない)', () => {
     const doc = fresh();
-    doc.pages[0].edges.find((e) => e.id === 'e-9')!.waypoints = [{ x: 1, y: 2 }];
+    doc.pages[0].edges.find((e) => e.id === 'e-9')!.waypoints = [{ x: 100, y: 200 }];
+    const r = paste(doc, copySelection(doc, P, { nodeIds: ['lap', 'enc'] })!, 20);
+    expect(r.ok).toBe(true);
+    expect(doc.pages[0].edges.at(-1)!.waypoints).toEqual([{ x: 120, y: 220 }]);
+    expect(doc.pages[0].edges.find((e) => e.id === 'e-9')!.waypoints).toEqual([{ x: 100, y: 200 }]);
+  });
+
+  it('手動の経路が無い線は、貼り付けても waypoints を持たない', () => {
+    const doc = fresh();
     const r = paste(doc, copySelection(doc, P, { nodeIds: ['lap', 'enc'] })!);
     expect(r.ok).toBe(true);
-    expect(doc.pages[0].edges.at(-1)!.waypoints).toBeUndefined();
+    expect('waypoints' in doc.pages[0].edges.at(-1)!).toBe(false);
   });
 
   it('枠を貼り付けると、新しい枠の中に、貼り付けた機器だけが所属する(元の機器は含まれない)', () => {

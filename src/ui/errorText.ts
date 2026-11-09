@@ -19,6 +19,7 @@ const ERROR_KEY: Record<NonNullable<ActionResult['error']>, MessageKey> = {
   'position-occupied': 'error.positionOccupied',
   'unknown-frame': 'error.unknownFrame',
   'unknown-note': 'error.unknownNote',
+  'unknown-edge': 'error.unknownEdge',
   'too-many-notes': 'error.tooManyNotes',
   'unknown-signal': 'error.unknownSignal',
   'signal-in-use': 'error.signalInUse',

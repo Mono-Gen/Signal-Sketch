@@ -1,4 +1,4 @@
-import { Cell, CellState, ConnectionHandler, EventObject, Graph, InternalEvent, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
+import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph, InternalEvent, Point, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
 import { markerSpec } from '../model/portMarker';
@@ -33,6 +33,8 @@ export interface ViewCallbacks {
   onFrameResize(frameId: string, rect: { x: number; y: number; w: number; h: number }): void;
   /** メモの変形(ハンドル操作)。位置とサイズ */
   onNoteResize(noteId: string, rect: { x: number; y: number; w: number; h: number }): void;
+  /** 線の経路を手で引き直した(ハンドル操作)。図の座標の点列。空なら、手動の経路を消した(自動配線へ戻る) */
+  onEdgeRoute(edgeId: string, points: { x: number; y: number }[]): void;
   /** 機器の変形(ハンドル操作)。位置とサイズ。fitImage は Shift を押していたか(画像の縦横比に合わせる) */
   onNodeResize(nodeId: string, rect: { x: number; y: number; w: number; h: number }, fitImage: boolean): void;
   onConnect(from: PortRef, to: PortRef): void;
@@ -336,6 +338,23 @@ export class DiagramView {
     const tooltip = g.getPlugin('TooltipHandler') as TooltipHandler;
     tooltip.getTooltipForCell = (cell: Cell) => this.portLabels.get(cell.getId() as string) ?? '';
 
+    // 線のハンドルで経路を引き直すと、線のセルの形状(中継点)が変わる。それをモデルへ書き戻す(描き直しや保存で消えないように)。
+    // 描き直しの最中の変更(こちらがモデルから中継点を設定したとき)は、利用者の操作ではないので無視する
+    g.getDataModel().addListener(InternalEvent.CHANGE, (_sender: unknown, evt: EventObject) => {
+      if (this.rendering) return;
+      const changes = ((evt.getProperty('edit') as { changes?: unknown[] } | undefined)?.changes ?? []) as unknown[];
+      for (const change of changes) {
+        if (!(change instanceof GeometryChange)) continue;
+        const cell = change.cell as Cell | null;
+        const edgeId = cell ? this.edgeByCell.get(cell.getId() as string) : undefined;
+        if (!edgeId || !cell) continue;
+        const points = (cell.getGeometry()?.points ?? []).map((p) => ({ x: p.x, y: p.y }));
+        const saved = this.store.doc.pages[0].edges.find((e) => e.id === edgeId)?.waypoints ?? [];
+        const unchanged = saved.length === points.length && saved.every((p, i) => Math.abs(p.x - points[i].x) < 1e-6 && Math.abs(p.y - points[i].y) < 1e-6);
+        if (!unchanged) setTimeout(() => this.callbacks.onEdgeRoute(edgeId, points), 0);
+      }
+    });
+
     g.addListener(InternalEvent.CELLS_MOVED, (_sender: unknown, evt: EventObject) => {
       const cells = (evt.getProperty('cells') ?? []) as Cell[];
       const moves: { id: string; x: number; y: number }[] = [];
@@ -637,6 +656,9 @@ export class DiagramView {
             targetPortConstraint: toSide ? SIDE_TO_CONSTRAINT[toSide] : undefined,
           },
         });
+        // 手で引き直した経路があれば、それを通る(自動配線の中継点として渡す)
+        const geometry = edge.getGeometry();
+        if (geometry && e.waypoints && e.waypoints.length > 0) geometry.points = e.waypoints.map((p) => new Point(p.x, p.y));
         this.edgeByCell.set(`e:${e.id}`, e.id);
         edgeCells.push(edge);
       }

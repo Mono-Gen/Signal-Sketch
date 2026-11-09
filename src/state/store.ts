@@ -2,6 +2,7 @@ import type { Action, ActionResult } from '../model/actions';
 import { documentLimitIssue } from '../model/docLimits';
 import { usedAssets } from '../model/imageActions';
 import type { DiagramDocument } from '../model/types';
+import { reconcileWaypoints } from '../model/waypoints';
 
 type Listener = () => void;
 
@@ -57,6 +58,8 @@ export class DocumentStore {
     const draft = { ...structuredClone(rest), assets } as DiagramDocument;
     const result = action(draft);
     if (!result.ok) return result;
+    // 機器やポートが動いたとき、手動で引き直した線の経路を追従させる(または捨てる)
+    reconcileWaypoints(this.current, draft);
     // どの機器・登録テンプレートからも使われなくなった画像は、図から外す(外す・差し替える・機器を消すたびに、枚数の上限へ近づかないよう)
     if (draft.assets && Object.keys(draft.assets).length > 0) {
       const used = usedAssets(draft);

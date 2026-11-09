@@ -26,6 +26,7 @@ export type ActionError =
   | 'position-occupied'
   | 'unknown-frame'
   | 'unknown-note'
+  | 'unknown-edge'
   | 'too-many-notes'
   | 'unknown-signal'
   | 'signal-in-use'
@@ -102,6 +103,7 @@ export function moveNodes(pageId: string, moves: readonly { id: string; x: numbe
     // 1件でも不正なら全体を適用しない(途中まで動いた状態を残さない)
     for (const m of moves) {
       if (!page.nodes.some((n) => n.id === m.id)) return fail('unknown-node');
+      if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return fail('invalid-value'); // NaN が座標に入ると、保存後に読み込めない図になる
     }
     for (const m of moves) {
       const node = page.nodes.find((n) => n.id === m.id)!;
