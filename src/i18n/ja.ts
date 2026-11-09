@@ -199,6 +199,8 @@ const ja = {
   'props.bulkTitle': 'まとめて変更',
   'props.bulkHint': '入力した項目だけ、選んだ機器すべてに反映します。値が違うものは空欄です',
   'props.mixed': '複数の値',
+  'props.portsMixed': '選んだ機器のポート構成が違うため、まとめては変えられません(同じポート構成の機器だけを選んでください)',
+  'props.portsBulkHint': '選んだ機器はポート構成が同じです。変更は全員に反映します',
   'props.ports': 'ポート',
   'props.addGroup': 'ポートを追加',
   'props.signal': '信号',

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { addNodeFromTemplate } from '../../src/model/actions';
-import { resizeNodes, updateNodes } from '../../src/model/bulkActions';
+import { resizeNodes, setPortGroupsMany, updateNodes } from '../../src/model/bulkActions';
+import { getNodePorts } from '../../src/model/query';
+import type { PortGroup } from '../../src/model/types';
 import { createEmptyDocument } from '../../src/model/defaults';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
 import { DocumentStore } from '../../src/state/store';
@@ -84,5 +86,45 @@ describe('resizeNodes', () => {
     const { doc, ids } = setup();
     expect(resizeNodes(P, [], { w: 200 })(doc).ok).toBe(false);
     expect(resizeNodes(P, [ids[0], 'nope'], { w: 200 })(doc).ok).toBe(false);
+  });
+});
+
+describe('setPortGroupsMany', () => {
+  const group = (count: number): PortGroup => ({ id: 'x1', signalType: 'LAN', direction: 'inout', side: 'left', count, labelPrefix: 'X ' });
+
+  it('全員のポート構成を同じにする', () => {
+    const { doc, ids } = setup();
+    expect(setPortGroupsMany(P, ids, [group(3)])(doc).ok).toBe(true);
+    for (const id of ids) {
+      const ports = getNodePorts(doc, node(doc, id));
+      expect(ports).toHaveLength(3);
+      expect(ports.every((p) => p.signalType === 'LAN')).toBe(true);
+    }
+  });
+
+  it('不正な構成なら失敗し、ストア経由では1台も変わらない', () => {
+    const { doc, ids } = setup();
+    const store = new DocumentStore(doc);
+    const before = ids.map((id) => getNodePorts(store.doc, node(store.doc, id)).length);
+    expect(store.apply(setPortGroupsMany(P, ids, [group(-1)])).ok).toBe(false);
+    expect(ids.map((id) => getNodePorts(store.doc, node(store.doc, id)).length)).toEqual(before);
+  });
+
+  it('線が消える台があると、確認済みの指定が無ければ失敗する', () => {
+    const { doc, ids } = setup();
+    setPortGroupsMany(P, ids, [group(2)])(doc);
+    const [a, b] = ids.map((id) => getNodePorts(doc, node(doc, id)));
+    doc.pages[0].edges.push({ id: 'e1', from: { nodeId: ids[0], portId: a[1].id }, to: { nodeId: ids[1], portId: b[1].id } } as never);
+    const store = new DocumentStore(doc);
+    expect(store.apply(setPortGroupsMany(P, ids, [group(1)])).ok).toBe(false);
+    expect(store.doc.pages[0].edges).toHaveLength(1);
+    expect(store.apply(setPortGroupsMany(P, ids, [group(1)], { removeOrphanEdges: true })).ok).toBe(true);
+    expect(store.doc.pages[0].edges).toHaveLength(0);
+  });
+
+  it('対象が空・存在しない機器は失敗する', () => {
+    const { doc, ids } = setup();
+    expect(setPortGroupsMany(P, [], [group(1)])(doc).ok).toBe(false);
+    expect(setPortGroupsMany(P, [ids[0], 'nope'], [group(1)])(doc).ok).toBe(false);
   });
 });

@@ -15,7 +15,7 @@ import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '.
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
 import { registerTemplate } from '../model/templateActions';
-import { resizeNodes, updateNodes } from '../model/bulkActions';
+import { resizeNodes, setPortGroupsMany, updateNodes } from '../model/bulkActions';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 import { askRegistrationName } from './registerDeviceDialog';
@@ -128,11 +128,11 @@ export class PropertiesPanel {
     const node = nodeId ? getPage(doc, this.ctx.pageId)?.nodes.find((n) => n.id === nodeId) : undefined;
     if (!node) {
       this.root.append(el('p', { className: 'hint', text: emptyHint }));
-      if (alignIds.length >= 2) this.root.append(this.bulkFields(alignIds), this.alignSection(alignIds), this.imageSection(alignIds));
+      if (alignIds.length >= 2) this.root.append(this.bulkFields(alignIds), this.bulkPortSection(doc, alignIds), this.alignSection(alignIds), this.imageSection(alignIds));
       this.root.append(this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
       return;
     }
-    this.root.append(this.basicFields(node), this.portSection(doc, node));
+    this.root.append(this.basicFields(node), this.portSection(doc, [node]));
   }
 
   /**
@@ -508,19 +508,40 @@ export class PropertiesPanel {
     }
   }
 
-  private portSection(doc: DiagramDocument, node: DiagramNode): HTMLElement {
+  /** 複数の機器のポート構成。全員の構成が同じときだけ編集欄を出す(違うと、どれを基準にするか決まらない) */
+  private bulkPortSection(doc: DiagramDocument, ids: readonly string[]): HTMLElement {
+    const nodes = (getPage(doc, this.ctx.pageId)?.nodes ?? []).filter((n) => ids.includes(n.id));
+    const layoutOf = (n: DiagramNode): string => {
+      const tpl = getTemplate(doc, n.templateId);
+      return JSON.stringify(tpl ? resolvePortGroups(tpl, n) : []);
+    };
+    if (nodes.length < 2 || new Set(nodes.map(layoutOf)).size > 1) {
+      return el('div', { className: 'section', attrs: { 'data-section': 'bulk-ports' } }, [
+        el('h3', { text: t('props.ports') }),
+        el('p', { className: 'hint', text: t('props.portsMixed') }),
+      ]);
+    }
+    return this.portSection(doc, nodes);
+  }
+
+  /** ポート構成の編集。複数の機器(構成が同じもの)を渡すと、変更は全員に反映する */
+  private portSection(doc: DiagramDocument, nodes: readonly DiagramNode[]): HTMLElement {
+    const node = nodes[0];
+    const many = nodes.length > 1;
+    const ids = nodes.map((n) => n.id);
+    const back = () => (many ? this.updateMulti(ids.length, ids) : this.update(node.id));
     const tpl = getTemplate(doc, node.templateId);
     const groups: PortGroup[] = tpl ? structuredClone(resolvePortGroups(tpl, node)) : [];
     const section = el('div', { className: 'section' }, [el('h3', { text: t('props.ports') })]);
 
     const commit = (next: PortGroup[]) => {
-      const lost = lostEdgeIds(this.ctx.getDoc(), this.ctx.pageId, node.id, next);
+      const lost = ids.flatMap((id) => lostEdgeIds(this.ctx.getDoc(), this.ctx.pageId, id, next));
       if (lost.length > 0 && !this.ctx.confirm(t('confirm.removePorts', { count: lost.length }))) {
-        this.update(node.id); // 取り消し: 入力欄を元の値へ戻す
+        back(); // 取り消し: 入力欄を元の値へ戻す
         return;
       }
-      const r = this.ctx.apply(setPortGroups(this.ctx.pageId, node.id, next, { removeOrphanEdges: lost.length > 0 }));
-      if (!r.ok) this.update(node.id);
+      const r = this.ctx.apply(many ? setPortGroupsMany(this.ctx.pageId, ids, next, { removeOrphanEdges: lost.length > 0 }) : setPortGroups(this.ctx.pageId, node.id, next, { removeOrphanEdges: lost.length > 0 }));
+      if (!r.ok) back();
     };
 
     groups.forEach((g, i) => {
@@ -551,8 +572,8 @@ export class PropertiesPanel {
       section.append(row);
     });
 
-    section.append(el('p', { className: 'hint', text: t('props.portMoveHint') }));
-    if (node.portPlacements) {
+    section.append(el('p', { className: 'hint', text: many ? t('props.portsBulkHint') : t('props.portMoveHint') }));
+    if (!many && node.portPlacements) {
       section.append(
         el('button', {
           text: t('props.resetPorts'),

@@ -1,7 +1,8 @@
 import type { Action } from './actions';
-import { updateNode } from './actions';
+import { setPortGroups, updateNode } from './actions';
 import { resizeNode } from './imageActions';
 import { getPage } from './query';
+import type { PortGroup } from './types';
 
 const fail = (error: 'unknown-page' | 'unknown-node' | 'invalid-value') => ({ ok: false as const, error });
 
@@ -40,6 +41,28 @@ export function resizeNodes(pageId: string, nodeIds: readonly string[], size: { 
       const node = page.nodes.find((n) => n.id === id);
       if (!node) return fail('unknown-node');
       const r = resizeNode(pageId, id, { w: size.w ?? node.w, h: size.h ?? node.h })(doc);
+      if (!r.ok) return r;
+    }
+    return { ok: true };
+  };
+}
+
+/**
+ * 複数の機器のポート構成を、同じ構成にまとめて置き換える。どれか1台でも失敗したら全体を取り消す。
+ * 線が消える台があるときは、removeOrphanEdges が無い限り失敗する(利用者の確認を取ってから指定する)。
+ */
+export function setPortGroupsMany(
+  pageId: string,
+  nodeIds: readonly string[],
+  groups: readonly PortGroup[],
+  options: { removeOrphanEdges?: boolean } = {},
+): Action {
+  return (doc) => {
+    const page = getPage(doc, pageId);
+    if (!page) return fail('unknown-page');
+    if (nodeIds.length === 0) return fail('invalid-value');
+    for (const id of nodeIds) {
+      const r = setPortGroups(pageId, id, groups, options)(doc);
       if (!r.ok) return r;
     }
     return { ok: true };

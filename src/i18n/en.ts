@@ -200,6 +200,8 @@ const en: Record<MessageKey, string> = {
   'props.bulkTitle': 'Change together',
   'props.bulkHint': 'Only the fields you edit are applied, to every selected device. Fields where the values differ are left blank',
   'props.mixed': 'Mixed values',
+  'props.portsMixed': 'The selected devices have different port layouts, so they cannot be changed together (select devices with the same layout)',
+  'props.portsBulkHint': 'The selected devices share the same port layout. Changes apply to all of them',
   'props.ports': 'Ports',
   'props.addGroup': 'Add ports',
   'props.signal': 'Signal',
