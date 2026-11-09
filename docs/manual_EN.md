@@ -222,6 +222,7 @@ Create a first draft of a diagram (devices and frames) from a quote or an equipm
 | Ctrl+wheel | Zoom around the mouse pointer |
 | Ctrl+`+` / Ctrl+`-` / Ctrl+0 | Zoom in / zoom out / back to 100% |
 | Ctrl+A | Select everything (devices, frames, lines) |
+| Arrow keys | Move the selected devices and frames by one grid step |
 | Delete / Backspace | Delete the selected devices, lines and frames |
 | Right-click | Menu (copy, duplicate, delete, paste, select all; with two or more devices selected, also align and space evenly) |
 | Drag (a device handle, with a single device selected) | Resize it |

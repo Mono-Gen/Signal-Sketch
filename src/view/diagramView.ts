@@ -287,6 +287,7 @@ export class DiagramView {
     // 一定の比率にはならない)をモデルが決めるので、機器だけは標準の固定を使わない(Shift でも、ドラッグした大きさをそのまま渡す)。
     // 枠は従来どおり(Shift で縦横比を固定)
     patchNodeConstrainedEvent();
+    this.applyDragPreviewColor();
     // 複数選択のときは、変形のハンドルを出さない(標準の設定: 選択が maxCells 個未満のときだけハンドルを作る)。
     // ハンドルは、選択が変わっても、すでに選ばれていたセルのものが使い回されるので、1つだけの選択から複数選択に変わったときは作り直す
     const handlers = g.getPlugin('SelectionCellsHandler') as SelectionCellsHandler | undefined;
@@ -378,7 +379,14 @@ export class DiagramView {
   setTheme(theme: Theme): void {
     if (theme === this.theme) return;
     this.theme = theme;
+    this.applyDragPreviewColor();
     this.render();
+  }
+
+  /** ドラッグ中の移動先の枠線(maxGraph 標準は黒)を、テーマに合わせる。ダークでは黒が背景に埋もれるため */
+  private applyDragPreviewColor(): void {
+    const handler = this.graph.getPlugin('SelectionHandler') as unknown as { previewColor: string } | undefined;
+    if (handler) handler.previewColor = this.theme.dragPreview;
   }
 
   /**

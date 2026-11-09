@@ -23,6 +23,8 @@ export interface Theme {
   ink: string;
   /** 重ね描きの文字・マークの縁取り(用紙の色に近い色) */
   halo: string;
+  /** 機器・枠をドラッグして動かしている間の、移動先の枠線の色 */
+  dragPreview: string;
   /** 移動中のポートの影の線 */
   ghostStroke: string;
   /** 枠選択の矩形の塗り */
@@ -50,6 +52,7 @@ export const FLAT_THEME: Theme = {
   ink: '#1f2a44',
   halo: '#ffffff',
   ghostStroke: '#2b3f6b',
+  dragPreview: '#000000',
   marqueeFill: 'rgba(232,89,12,.08)',
   signalPaper: null,
 };
@@ -68,6 +71,7 @@ export const DARK_THEME: Theme = {
   ink: '#e6ebf7',
   halo: '#141a26',
   ghostStroke: '#a9b8d6',
+  dragPreview: '#ffffff',
   marqueeFill: 'rgba(255,138,76,.14)',
   signalPaper: '#141a26',
 };

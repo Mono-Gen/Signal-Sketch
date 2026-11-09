@@ -88,7 +88,7 @@ const en: Record<MessageKey, string> = {
   'props.portMoveHint': 'Hold Shift and drag a port to move it',
   'props.resetPorts': 'Reset port positions to automatic',
   'error.unknownSignal': 'Signal type not found',
-  'error.signalInUse': 'This signal type is in use and cannot be deleted',
+  'error.signalInUse': 'This signal type is in use and cannot be deleted (a port on a device in the diagram, or a device type definition, uses it)',
   'legend.edit': 'Edit legend',
   'legend.add': 'Add signal type',
   'legend.newLabel': 'New signal',

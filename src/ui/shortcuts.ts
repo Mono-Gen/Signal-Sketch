@@ -13,6 +13,8 @@ export interface ShortcutCommands {
   /** Esc: ポートの選択を解除する */
   escape(): void;
   deleteSelection(): void;
+  /** 矢印キー: 選択中の機器・枠を、グリッド1つ分(dx, dy は -1/0/1)動かす */
+  nudge(dx: number, dy: number): void;
 }
 
 /**
@@ -59,6 +61,9 @@ export function installShortcuts(c: ShortcutCommands): void {
       c.save();
     } else if (ev.key === 'Escape') {
       c.escape();
+    } else if (!mod && !ev.altKey && !target?.closest('[role="menu"]') && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight' || ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
+      ev.preventDefault(); // ページのスクロールを起こさない
+      c.nudge(ev.key === 'ArrowLeft' ? -1 : ev.key === 'ArrowRight' ? 1 : 0, ev.key === 'ArrowUp' ? -1 : ev.key === 'ArrowDown' ? 1 : 0);
     } else if (ev.key === 'Delete' || ev.key === 'Backspace') {
       ev.preventDefault();
       c.deleteSelection();

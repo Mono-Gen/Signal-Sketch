@@ -4,7 +4,7 @@ import { addNodeFromTemplate, addNodesInRow, setGridEnabled } from './model/acti
 import type { Action, ActionResult } from './model/actions';
 import { createEmptyDocument } from './model/defaults';
 import { diagnose } from './model/diagnostics';
-import { addFrame } from './model/frames';
+import { addFrame, moveSelection } from './model/frames';
 import { PRESETS, presetToTemplate } from './model/presets';
 import { getTemplate } from './model/query';
 import { removeTemplate } from './model/templateActions';
@@ -245,6 +245,17 @@ const zoom = installZoomControls({
   onChange: chrome.syncToolbar,
 });
 
+/** 選択中の機器・枠を、グリッド1つ分(グリッドが無効でも同じ幅)だけ動かす。矢印キー用 */
+function nudgeSelection(dx: number, dy: number): void {
+  const sel = view.getSelection();
+  const page = store.doc.pages.find((p) => p.id === PAGE_ID);
+  if (!page || (sel.nodeIds.length === 0 && sel.frameIds.length === 0)) return;
+  const step = store.doc.grid.size;
+  const nodeMoves = page.nodes.filter((n) => sel.nodeIds.includes(n.id)).map((n) => ({ id: n.id, x: n.x + dx * step, y: n.y + dy * step }));
+  const frameMoves = page.groups.filter((g) => sel.frameIds.includes(g.id)).map((g) => ({ id: g.id, x: g.x + dx * step, y: g.y + dy * step }));
+  apply(moveSelection(PAGE_ID, nodeMoves, frameMoves));
+}
+
 installShortcuts({
   zoomIn: () => zoom.step(1),
   zoomOut: () => zoom.step(-1),
@@ -258,6 +269,7 @@ installShortcuts({
   selectAll: () => view.selectAll(),
   escape: () => view.clearPortSelection(),
   deleteSelection: clipboard.deleteSelection,
+  nudge: nudgeSelection,
 });
 
 // 未保存の変更があるままタブを閉じようとしたときの警告

@@ -87,7 +87,7 @@ const ja = {
   'props.portMoveHint': 'Shift を押しながらポートをドラッグすると、位置を動かせます',
   'props.resetPorts': 'ポート位置を自動配置に戻す',
   'error.unknownSignal': '信号の種類が見つかりません',
-  'error.signalInUse': 'この信号は使われているため削除できません',
+  'error.signalInUse': 'この信号は使われているため削除できません(図の機器のポート、または機器の種類の定義が使っています)',
   'legend.edit': '凡例の編集',
   'legend.add': '信号の種類を追加',
   'legend.newLabel': '新しい信号',
