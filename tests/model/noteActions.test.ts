@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseDocument, serializeDocument } from '../../src/io/fileIo';
 import { buildSvg } from '../../src/io/svgExport';
-import { removeItems } from '../../src/model/actions';
+import { removeItems, setPageSize } from '../../src/model/actions';
 import { copySelection, pasteClipboard } from '../../src/model/clipboard';
 import { addFrame, moveSelection } from '../../src/model/frames';
 import { createEmptyDocument } from '../../src/model/defaults';
@@ -169,6 +169,8 @@ describe('削除・保存・検査', () => {
       (d) => (d.pages[0].notes![0].text = 'x'.repeat(MAX_NOTE_LENGTH + 1)),
       (d) => d.pages[0].notes!.push({ ...d.pages[0].notes![0] }),
       (d) => ((d.pages[0].notes![0] as unknown as { x: string }).x = 'a'),
+      (d) => (d.pages[0].notes![0].w = 0),
+      (d) => (d.pages[0].notes![0].h = -1),
       (d) => {
         d.pages[0].notes = Array.from({ length: MAX_NOTES_PER_PAGE + 1 }, (_, i) => ({ id: `n${i}`, text: 't', x: 0, y: 0, w: 50, h: 30 }));
       },
@@ -255,6 +257,30 @@ describe('メモと他の機能の連携', () => {
     const byId = (id: string) => notes(doc).find((n) => n.id === id)!;
     expect([byId(inside).x, byId(inside).y]).toEqual([before[inside][0] + 50, before[inside][1] + 30]);
     expect([byId(outside).x, byId(outside).y]).toEqual(before[outside]);
+  });
+
+  it('外枠と内枠を同時に動かしても、両方に属するメモは1回分だけ動く(監査の指摘)', () => {
+    const doc = fresh();
+    const outer = addFrame(P, '外', { x: 100, y: 100 })(doc).created!;
+    const inner = addFrame(P, '内', { x: 120, y: 120 })(doc).created!;
+    Object.assign(doc.pages[0].groups.find((g) => g.id === outer)!, { x: 100, y: 100, w: 600, h: 400 });
+    Object.assign(doc.pages[0].groups.find((g) => g.id === inner)!, { x: 140, y: 140, w: 200, h: 150 });
+    const note = addNote(P, { x: 160, y: 160 }, '二重')(doc).created!;
+    const before = notes(doc).find((n) => n.id === note)!.x;
+    const o = doc.pages[0].groups.find((g) => g.id === outer)!;
+    const i = doc.pages[0].groups.find((g) => g.id === inner)!;
+    expect(moveSelection(P, [], [{ id: outer, x: o.x + 10, y: o.y }, { id: inner, x: i.x + 10, y: i.y }])(doc).ok).toBe(true);
+    expect(notes(doc).find((n) => n.id === note)!.x).toBe(before + 10);
+  });
+
+  it('ページを小さくして、メモがはみ出すなら断る(メモの本文の1行目が理由に出る)。収まるなら通る', () => {
+    const doc = fresh();
+    addNote(P, { x: 1000, y: 600 }, '右下のメモ\n二行目')(doc);
+    const r = setPageSize(P, { w: 640, h: 360 })(doc);
+    expect(r).toMatchObject({ ok: false, error: 'page-too-small' });
+    expect(r.blockers).toEqual(['右下のメモ']);
+    expect(doc.pages[0].size.w).toBe(1280);
+    expect(setPageSize(P, { w: 1280, h: 720 })(doc).ok).toBe(true);
   });
 
   it('メモを含む図は、古いコピーデータ(notes なし)も貼れる', () => {

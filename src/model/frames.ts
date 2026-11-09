@@ -149,15 +149,20 @@ export function moveSelection(
       }
     }
 
-    // 枠の中にあるメモも、枠といっしょに動く(中の機器と同じ考え方。メモ自身を動かす指定は、あとで moveNotes が絶対位置で上書きする)
+    // 枠の中にあるメモも、枠といっしょに動く(中の機器と同じ考え方。メモ自身を動かす指定は、あとで moveNotes が絶対位置で上書きする)。
+    // 所属と移動量は、機器と同じく、動かす前の位置で先にすべて決める(外枠と内枠を同時に動かしても、メモは1回だけ動く)
+    const noteShift = new Map<string, { dx: number; dy: number }>();
     for (const m of frameMoves) {
       const frame = page.groups.find((x) => x.id === m.id)!;
       const d = { dx: s(m.x) - frame.x, dy: s(m.y) - frame.y };
       for (const note of page.notes ?? []) {
-        if (!centerInside(note, frame)) continue;
-        note.x = Math.max(0, Math.min(note.x + d.dx, page.size.w - note.w));
-        note.y = Math.max(0, Math.min(note.y + d.dy, page.size.h - note.h));
+        if (centerInside(note, frame) && !noteShift.has(note.id)) noteShift.set(note.id, d);
       }
+    }
+    for (const [id, d] of noteShift) {
+      const note = page.notes!.find((x) => x.id === id)!;
+      note.x = Math.max(0, Math.min(note.x + d.dx, page.size.w - note.w));
+      note.y = Math.max(0, Math.min(note.y + d.dy, page.size.h - note.h));
     }
 
     for (const [id, d] of nodeShift) {

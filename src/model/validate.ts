@@ -2,7 +2,7 @@ import { exceedsPortLimit, expandPortGroups, expandUnits, MAX_PORTS_PER_NODE, MA
 import { isValidPageSize, MAX_PAGE, MIN_PAGE } from './pageSize';
 import { assetsIssue } from './images';
 import { MAX_NOTE_FONT, MAX_NOTE_LENGTH, MAX_NOTES_PER_PAGE, MIN_NOTE_FONT } from './notes';
-import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from './docLimits';
+import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE, MAX_WAYPOINTS } from './docLimits';
 import { LINE_STYLES } from './lineStyle';
 import { isHexColor } from './signalActions';
 import { MAX_TEMPLATES } from './templateActions';
@@ -185,6 +185,7 @@ function checkFields(doc: Record<string, unknown>): string[] {
       }
       if (e.waypoints !== undefined) {
         if (!Array.isArray(e.waypoints)) bad(`${w}.waypoints は配列である必要があります`);
+        else if (e.waypoints.length > MAX_WAYPOINTS) bad(`${w}.waypoints は${MAX_WAYPOINTS}点までです`);
         else (e.waypoints as unknown[]).forEach((pt, k) => (isRecord(pt) ? (num(`${w}.waypoints[${k}]`, 'x', pt.x), num(`${w}.waypoints[${k}]`, 'y', pt.y)) : bad(`${w}.waypoints[${k}] はオブジェクトである必要があります`)));
       }
     });
@@ -195,6 +196,7 @@ function checkFields(doc: Record<string, unknown>): string[] {
         str(w, 'text', n.text);
         if (typeof n.text === 'string' && n.text.length > MAX_NOTE_LENGTH) bad(`${w}.text は${MAX_NOTE_LENGTH}文字までです`);
         for (const k of ['x', 'y', 'w', 'h']) num(w, k, n[k]);
+        if ((typeof n.w === 'number' && n.w <= 0) || (typeof n.h === 'number' && n.h <= 0)) bad(`${w} の幅と高さは正の数である必要があります`);
         if (n.color !== undefined && !isHexColor(n.color)) bad(`${w}.color は #RRGGBB 形式である必要があります`);
         num(w, 'fontSize', n.fontSize, true);
         if (typeof n.fontSize === 'number' && (n.fontSize < MIN_NOTE_FONT || n.fontSize > MAX_NOTE_FONT)) bad(`${w}.fontSize は${MIN_NOTE_FONT}〜${MAX_NOTE_FONT}である必要があります`);

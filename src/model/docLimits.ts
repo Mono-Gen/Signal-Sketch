@@ -10,6 +10,9 @@ export const MAX_NODES_PER_PAGE = 2000;
 /** 1ページあたりのポートの合計(台数ぶんを含む)の上限 */
 export const MAX_PORTS_PER_PAGE = 20000;
 
+/** 1本の線の、手で引き直した経路の中継点の数の上限(読み込みと設定の両方で守る) */
+export const MAX_WAYPOINTS = 50;
+
 /** 1ページあたりの接続の数の上限 */
 export const MAX_EDGES_PER_PAGE = 20000;
 

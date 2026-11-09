@@ -35,9 +35,19 @@ interface Boxed {
  * ページを小さくしてよいかの判定と、断る理由の提示に使う。
  */
 export function itemsOutside(
-  page: { nodes: readonly { id: string; label: string; x: number; y: number; w: number; h: number }[]; groups: readonly Boxed[] },
+  page: {
+    nodes: readonly { id: string; label: string; x: number; y: number; w: number; h: number }[];
+    groups: readonly Boxed[];
+    notes?: readonly { id: string; text: string; x: number; y: number; w: number; h: number }[];
+  },
   size: { w: number; h: number },
 ): string[] {
   const out = (b: { x: number; y: number; w: number; h: number }) => b.x < 0 || b.y < 0 || b.x + b.w > size.w || b.y + b.h > size.h;
-  return [...page.nodes.filter(out).map((n) => n.label || n.id), ...page.groups.filter(out).map((g) => g.label || '(枠)')];
+  // メモは本文の1行目を名前の代わりに示す(長いときは切る)
+  const noteName = (m: { id: string; text: string }) => (m.text.split('\n')[0].slice(0, 12) || m.id);
+  return [
+    ...page.nodes.filter(out).map((n) => n.label || n.id),
+    ...page.groups.filter(out).map((g) => g.label || '(枠)'),
+    ...(page.notes ?? []).filter(out).map(noteName),
+  ];
 }

@@ -24,7 +24,8 @@ export interface ShortcutCommands {
 export function installShortcuts(c: ShortcutCommands): void {
   window.addEventListener('keydown', (ev) => {
     const target = ev.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+    // 入力欄に加えて、ダブルクリックで文字を直している最中(contenteditable)も、キーを奪わない(矢印キーがカーソル移動のはずが、図の移動になってしまう)
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
     // モーダルのダイアログが開いている間は、背後の図を操作するキー(Ctrl+A・Delete・Ctrl+Z など)を奪わない
     if (document.querySelector('dialog[open]')) return;
     const mod = ev.ctrlKey || ev.metaKey;

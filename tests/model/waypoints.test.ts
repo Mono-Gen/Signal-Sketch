@@ -4,6 +4,7 @@ import { addEdge, addNodeFromTemplate, moveNodes, removeItems } from '../../src/
 import { createEmptyDocument } from '../../src/model/defaults';
 import { addFrame, moveSelection } from '../../src/model/frames';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
+import { validateDocument } from '../../src/model/validate';
 import { MAX_WAYPOINTS, setEdgeWaypoints } from '../../src/model/waypoints';
 import { DocumentStore } from '../../src/state/store';
 
@@ -49,6 +50,17 @@ describe('setEdgeWaypoints', () => {
     expect(store.apply(setEdgeWaypoints(P, 'nope', [{ x: 1, y: 1 }]))).toMatchObject({ ok: false, error: 'unknown-edge' });
     expect(store.apply(setEdgeWaypoints('nope', edgeId, [{ x: 1, y: 1 }]))).toMatchObject({ ok: false, error: 'unknown-page' });
     expect(wp(store)).toBeUndefined();
+  });
+
+  it('読み込みでも、中継点の上限(50点)を守る。上限ちょうどは通る(監査の指摘)', () => {
+    const { store } = withEdge();
+    const make = (count: number) => {
+      const d = JSON.parse(JSON.stringify(store.doc)) as Doc;
+      d.pages[0].edges[0].waypoints = Array.from({ length: count }, (_, i) => ({ x: i, y: i }));
+      return d;
+    };
+    expect(validateDocument(make(MAX_WAYPOINTS)).ok).toBe(true);
+    expect(validateDocument(make(MAX_WAYPOINTS + 1)).ok).toBe(false);
   });
 
   it('元に戻すで、経路の設定が戻る', () => {

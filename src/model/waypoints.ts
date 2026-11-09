@@ -1,11 +1,11 @@
 import type { Action, ActionResult } from './actions';
+import { MAX_WAYPOINTS } from './docLimits';
 import { getPage, layoutNodePorts } from './query';
 import type { DiagramDocument, DiagramEdge, PortRef } from './types';
 
 // 手動で引き直した線の経路(Edge.waypoints)の保存と、機器が動いたときの追従。
 
-/** 1本の線に持てる中継点の数(巨大なデータで描画が固まらないように) */
-export const MAX_WAYPOINTS = 50;
+export { MAX_WAYPOINTS };
 
 const EPS = 1e-6;
 
