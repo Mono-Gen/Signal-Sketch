@@ -1,6 +1,7 @@
 import { exceedsPortLimit, expandPortGroups, expandUnits, MAX_PORTS_PER_NODE, MAX_UNITS, resolvePortGroups } from './ports';
 import { isValidPageSize, MAX_PAGE, MIN_PAGE } from './pageSize';
 import { assetsIssue } from './images';
+import { MAX_NOTE_FONT, MAX_NOTE_LENGTH, MAX_NOTES_PER_PAGE, MIN_NOTE_FONT } from './notes';
 import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from './docLimits';
 import { isHexColor } from './signalActions';
 import { MAX_TEMPLATES } from './templateActions';
@@ -58,6 +59,7 @@ function checkShape(doc: Record<string, unknown>): string[] {
     const nodesOk = records(`pages[${pi}].nodes`, page.nodes);
     records(`pages[${pi}].edges`, page.edges);
     records(`pages[${pi}].groups`, page.groups, false);
+    records(`pages[${pi}].notes`, page.notes, false);
     if (nodesOk) {
       (page.nodes as Record<string, unknown>[]).forEach((n, ni) => {
         if (n.portGroupsOverride !== undefined) records(`pages[${pi}].nodes[${ni}].portGroupsOverride`, n.portGroupsOverride);
@@ -184,6 +186,18 @@ function checkFields(doc: Record<string, unknown>): string[] {
         else (e.waypoints as unknown[]).forEach((pt, k) => (isRecord(pt) ? (num(`${w}.waypoints[${k}]`, 'x', pt.x), num(`${w}.waypoints[${k}]`, 'y', pt.y)) : bad(`${w}.waypoints[${k}] はオブジェクトである必要があります`)));
       }
     });
+    if (Array.isArray(page.notes)) {
+      (page.notes as Record<string, unknown>[]).forEach((n, ni) => {
+        const w = `${pw}.notes[${ni}]`;
+        str(w, 'id', n.id);
+        str(w, 'text', n.text);
+        if (typeof n.text === 'string' && n.text.length > MAX_NOTE_LENGTH) bad(`${w}.text は${MAX_NOTE_LENGTH}文字までです`);
+        for (const k of ['x', 'y', 'w', 'h']) num(w, k, n[k]);
+        if (n.color !== undefined && !isHexColor(n.color)) bad(`${w}.color は #RRGGBB 形式である必要があります`);
+        num(w, 'fontSize', n.fontSize, true);
+        if (typeof n.fontSize === 'number' && (n.fontSize < MIN_NOTE_FONT || n.fontSize > MAX_NOTE_FONT)) bad(`${w}.fontSize は${MIN_NOTE_FONT}〜${MAX_NOTE_FONT}である必要があります`);
+      });
+    }
     if (Array.isArray(page.groups)) {
       (page.groups as Record<string, unknown>[]).forEach((f, fi) => {
         const w = `${pw}.groups[${fi}]`;
@@ -226,6 +240,11 @@ export function validateDocument(input: unknown): ValidationResult {
   if (Array.isArray(input.deviceTemplates) && input.deviceTemplates.length > MAX_TEMPLATES) {
     return { ok: false, errors: [`テンプレートは図全体で${MAX_TEMPLATES}件までです`] };
   }
+  for (const page of Array.isArray(input.pages) ? input.pages : []) {
+    if (isRecord(page) && Array.isArray(page.notes) && page.notes.length > MAX_NOTES_PER_PAGE) {
+      return { ok: false, errors: [`メモは1ページあたり${MAX_NOTES_PER_PAGE}個までです`] };
+    }
+  }
   const shapeErrors = checkShape(input);
   if (shapeErrors.length > 0) return { ok: false, errors: shapeErrors };
   const fieldErrors = checkFields(input);
@@ -252,6 +271,11 @@ export function validateDocument(input: unknown): ValidationResult {
     const where = `ページ ${page.id}`;
     if (!isRecord(page.size) || !isValidPageSize(page.size)) {
       errors.push(`${where}: ページの大きさが不正です(幅${MIN_PAGE.w}〜${MAX_PAGE}、高さ${MIN_PAGE.h}〜${MAX_PAGE}の整数)`);
+    }
+    const noteIds = new Set<string>();
+    for (const n of page.notes ?? []) {
+      if (noteIds.has(n.id)) errors.push(`${where}: メモIDが重複しています: ${n.id}`);
+      noteIds.add(n.id);
     }
     const nodeIds = new Set<string>();
     const portsByNode = new Map<string, Set<string>>();

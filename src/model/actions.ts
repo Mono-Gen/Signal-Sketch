@@ -25,6 +25,8 @@ export type ActionError =
   | 'ports-in-use'
   | 'position-occupied'
   | 'unknown-frame'
+  | 'unknown-note'
+  | 'too-many-notes'
   | 'unknown-signal'
   | 'signal-in-use'
   | 'template-in-use'
@@ -514,7 +516,7 @@ export function setGridEnabled(enabled: boolean): Action {
 /** 機器と接続を削除する。削除した機器につながる接続も一緒に消える */
 export function removeItems(
   pageId: string,
-  items: { nodeIds?: readonly string[]; edgeIds?: readonly string[]; frameIds?: readonly string[] },
+  items: { nodeIds?: readonly string[]; edgeIds?: readonly string[]; frameIds?: readonly string[]; noteIds?: readonly string[] },
 ): Action {
   return (doc) => {
     const page = getPage(doc, pageId);
@@ -528,6 +530,10 @@ export function removeItems(
     // 枠だけを消す。中の機器は残る(所属は見た目で決まるので、後始末は要らない)
     const frameIds = new Set(items.frameIds ?? []);
     page.groups = page.groups.filter((g) => !frameIds.has(g.id));
+    if (items.noteIds && page.notes) {
+      const noteIds = new Set(items.noteIds);
+      page.notes = page.notes.filter((n) => !noteIds.has(n.id));
+    }
     return OK;
   };
 }

@@ -18,6 +18,8 @@ const ERROR_KEY: Record<NonNullable<ActionResult['error']>, MessageKey> = {
   'ports-in-use': 'error.portsInUse',
   'position-occupied': 'error.positionOccupied',
   'unknown-frame': 'error.unknownFrame',
+  'unknown-note': 'error.unknownNote',
+  'too-many-notes': 'error.tooManyNotes',
   'unknown-signal': 'error.unknownSignal',
   'signal-in-use': 'error.signalInUse',
   'template-in-use': 'error.templateInUse',

@@ -105,6 +105,20 @@ export interface DiagramGroup {
   memberNodeIds?: string[];
 }
 
+/** メモ。図の上に置く、文字だけの部品(枠や背景は持たない)。w / h は折り返しと、つかめる範囲を決める */
+export interface DiagramNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** 文字色(#RRGGBB)。なければテーマの文字色 */
+  color?: string;
+  /** 文字の大きさ(px)。なければ標準 */
+  fontSize?: number;
+}
+
 export interface Page {
   id: string;
   name: string;
@@ -112,6 +126,8 @@ export interface Page {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   groups: DiagramGroup[];
+  /** メモ(古いファイルには無い) */
+  notes?: DiagramNote[];
 }
 
 export interface GridSettings {
