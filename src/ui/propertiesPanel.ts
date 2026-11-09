@@ -15,6 +15,7 @@ import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '.
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
 import { registerTemplate } from '../model/templateActions';
+import { resizeNodes, updateNodes } from '../model/bulkActions';
 import { applyAlignPlan } from './alignCommands';
 import { el, field, select } from './dom';
 import { askRegistrationName } from './registerDeviceDialog';
@@ -127,11 +128,66 @@ export class PropertiesPanel {
     const node = nodeId ? getPage(doc, this.ctx.pageId)?.nodes.find((n) => n.id === nodeId) : undefined;
     if (!node) {
       this.root.append(el('p', { className: 'hint', text: emptyHint }));
-      if (alignIds.length >= 2) this.root.append(this.alignSection(alignIds), this.imageSection(alignIds));
+      if (alignIds.length >= 2) this.root.append(this.bulkFields(alignIds), this.alignSection(alignIds), this.imageSection(alignIds));
       this.root.append(this.checksSection(doc), this.pageSizeSection(doc), this.legendSection(doc));
       return;
     }
     this.root.append(this.basicFields(node), this.portSection(doc, node));
+  }
+
+  /**
+   * 複数の機器をまとめて変える欄(名称・型番・台数・幅・高さ)。全員の値が同じならその値を、違えば空欄(「複数の値」)を出し、
+   * 利用者が入力した項目だけを全員に反映する。種類が違う機器どうしでも共通で持つ項目だけを対象にする。
+   */
+  private bulkFields(ids: readonly string[]): HTMLElement {
+    const doc = this.ctx.getDoc();
+    const nodes = (getPage(doc, this.ctx.pageId)?.nodes ?? []).filter((n) => ids.includes(n.id));
+    const common = (pick: (n: DiagramNode) => string): string => {
+      const values = new Set(nodes.map(pick));
+      return values.size === 1 ? [...values][0] : '';
+    };
+    const mixed = (pick: (n: DiagramNode) => string): boolean => new Set(nodes.map(pick)).size > 1;
+    const refill = () => this.updateMulti(ids.length, ids);
+    const input = (dataProp: string, pick: (n: DiagramNode) => string, type: 'text' | 'number', onChange: (raw: string) => void, extra: Record<string, string> = {}) =>
+      el('input', {
+        attrs: { type, value: common(pick), 'data-prop': dataProp, ...(mixed(pick) ? { placeholder: t('props.mixed') } : {}), ...extra },
+        on: { change: (ev) => onChange((ev.target as HTMLInputElement).value) },
+      });
+    const step = doc.grid.enabled ? String(doc.grid.size) : '1';
+    const size = (prop: 'w' | 'h') => (raw: string) => {
+      if (raw.trim() !== '') this.ctx.apply(resizeNodes(this.ctx.pageId, ids, { [prop]: Number(raw) }));
+      refill(); // 不正な値は元へ戻し、丸めや最小への補正は欄へ反映する
+    };
+    const text = (prop: 'label' | 'model') => (raw: string) => {
+      const r = this.ctx.apply(updateNodes(this.ctx.pageId, ids, { [prop]: raw }));
+      if (!r.ok) refill();
+    };
+    const count = (raw: string) => {
+      const trimmed = raw.trim();
+      if (trimmed === '') {
+        refill(); // 空は「変更しない」(台数表記を消す操作は、1台ずつ選んで行う)
+        return;
+      }
+      const next = Number(trimmed);
+      const lost = Number.isInteger(next) && next >= 1 ? [...new Set(ids.flatMap((id) => lostEdgeIdsForCount(this.ctx.getDoc(), this.ctx.pageId, id, next)))] : [];
+      if (lost.length > 0 && !this.ctx.confirm(t('confirm.removePorts', { count: lost.length }))) {
+        refill();
+        return;
+      }
+      const r = this.ctx.apply(updateNodes(this.ctx.pageId, ids, { count: next }, { removeOrphanEdges: lost.length > 0 }));
+      if (!r.ok) refill();
+    };
+    return el('div', { className: 'section', attrs: { 'data-section': 'bulk' } }, [
+      el('h3', { text: t('props.bulkTitle') }),
+      el('p', { className: 'hint', text: t('props.bulkHint') }),
+      field(t('props.name'), input('bulk-label', (n) => n.label, 'text', text('label'))),
+      field(t('props.model'), input('bulk-model', (n) => n.model, 'text', text('model'))),
+      field(t('props.count'), input('bulk-count', (n) => (n.count ? String(n.count) : ''), 'number', count, { min: '1', step: '1' })),
+      el('div', { className: 'size-row' }, [
+        field(t('props.width'), input('bulk-width', (n) => String(Math.round(n.w)), 'number', size('w'), { min: '1', step })),
+        field(t('props.height'), input('bulk-height', (n) => String(Math.round(n.h)), 'number', size('h'), { min: '1', step })),
+      ]),
+    ]);
   }
 
   /** 選んだ機器の揃え・等間隔。動く機器がなければ何も適用せず(履歴を積まず)、その旨を知らせる */
