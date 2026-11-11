@@ -423,14 +423,6 @@ export class PropertiesPanel {
         attrs: { type: 'color', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color' },
         on: { change: (ev) => this.ctx.apply(updateSignalType(s.id, { color: (ev.target as HTMLInputElement).value })) },
       });
-      const colorText = el('input', {
-        attrs: { type: 'text', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color-text' },
-        on: { change: (ev) => {
-          const input = ev.target as HTMLInputElement;
-          if (!isHexColor(input.value)) { input.value = s.color; this.ctx.setStatus('error', t('legend.badColor')); return; }
-          if (!this.ctx.apply(updateSignalType(s.id, { color: input.value })).ok) input.value = s.color;
-        } },
-      });
       const label = el('input', { attrs: { type: 'text', value: s.label, 'data-prop': 'signal-label' }, on: { change: (ev) => {
         if (!this.ctx.apply(updateSignalType(s.id, { label: (ev.target as HTMLInputElement).value })).ok) this.update(null);
       } } });
@@ -445,7 +437,7 @@ export class PropertiesPanel {
       parent.addEventListener('change', () => { if (!this.ctx.apply(setSignalParent(s.id, parent.value || null)).ok) this.update(null); });
       const button = (text: string, action: string, disabled: boolean, click: () => void, aria = text) =>
         el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click } });
-      const main = el('div', { className: 'legend-row-main' }, [color, colorText, label,
+      const main = el('div', { className: 'legend-row-main' }, [color, label,
         button(t('legend.up'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1)), t('legend.upLabel')),
         button(t('legend.down'), 'signal-down', i === peers.length - 1, () => this.ctx.apply(moveSignalType(s.id, 1)), t('legend.downLabel'))]);
       const sub = el('div', { className: 'legend-row-sub' }, [line, parent]);

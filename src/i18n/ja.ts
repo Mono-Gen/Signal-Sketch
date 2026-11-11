@@ -96,7 +96,6 @@ const ja = {
   'legend.noParent': '親なし',
   'legend.addChild': '子を追加',
   'legend.recreate': '親の色から作り直す',
-  'legend.badColor': '色を変更できません。#RRGGBB 形式で入力してください。',
   'legend.children': '子の信号があるため削除できません。先に子を移動または削除してください。',
   'legend.usedDevices': '機器: {names}',
   'legend.usedTemplates': 'テンプレート: {names}',

@@ -97,7 +97,6 @@ const en: Record<MessageKey, string> = {
   'legend.noParent': 'No parent',
   'legend.addChild': 'Add child',
   'legend.recreate': 'Recreate from parent color',
-  'legend.badColor': 'Color was not changed. Enter it as #RRGGBB.',
   'legend.children': 'This signal has children. Move or remove them first.',
   'legend.usedDevices': 'Devices: {names}',
   'legend.usedTemplates': 'Templates: {names}',
