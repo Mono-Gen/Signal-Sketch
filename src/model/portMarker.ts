@@ -33,9 +33,11 @@ export function portLabelPosition(side: Side, x: number, y: number, markerSize: 
 }
 
 /**
- * 図の上に出すポートの文字。上辺・下辺は、ポートが1グリッドずつ並ぶため、接頭辞を除いた番号だけにする
- * (「LAN1」「LAN2」だと隣と重なって読めない)。左右の辺は縦に並ぶので、名前の全体を出す。
+ * 図の上に出すポートの文字。複数のポートがあるグループは、接頭辞を除いた番号だけにする
+ * (1グリッドずつ並ぶ上辺・下辺で「LAN1」「LAN2」が重ならないようにし、辺ごとの見た目もそろえる)。
+ * ポートが1つだけのグループは、名前そのもの(「HDMI」「IN」)を出す。名前は、ホバーで出る説明で確かめられる。
+ * side は将来、辺ごとに変える余地のために受け取るが、いまは使わない。
  */
-export function portLabelText(port: { label: string; shortLabel?: string }, side: Side): string {
-  return side === 'top' || side === 'bottom' ? (port.shortLabel ?? port.label) : port.label;
+export function portLabelText(port: { label: string; shortLabel?: string }, _side: Side): string {
+  return port.shortLabel ?? port.label;
 }

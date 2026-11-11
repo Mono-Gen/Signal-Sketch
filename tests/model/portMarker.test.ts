@@ -30,14 +30,8 @@ it('各辺のラベルをマークの内側に置く', () => {
 describe('portLabelText(図の上に出すポートの文字)', () => {
   const port = { label: 'LAN3', shortLabel: '3' };
 
-  it('上辺・下辺は番号だけにする(1グリッドずつ並ぶ文字が重ならないように)', () => {
-    expect(portLabelText(port, 'bottom')).toBe('3');
-    expect(portLabelText(port, 'top')).toBe('3');
-  });
-
-  it('左右の辺は名前の全体を出す', () => {
-    expect(portLabelText(port, 'left')).toBe('LAN3');
-    expect(portLabelText(port, 'right')).toBe('LAN3');
+  it('どの辺でも、番号だけにする(辺ごとの見た目をそろえ、1グリッドずつ並ぶ文字が重ならないように)', () => {
+    for (const side of ['top', 'bottom', 'left', 'right'] as const) expect(portLabelText(port, side)).toBe('3');
   });
 
   it('短い表示名がなければ、名前の全体にする', () => {
