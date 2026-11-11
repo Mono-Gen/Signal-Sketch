@@ -80,3 +80,29 @@ describe('autoNodeSize', () => {
     }
   });
 });
+
+describe('autoNodeSize(ポート番号を表示するときの高さの下限)', () => {
+  const withLabels = (groups: PortGroup[], model = '') => autoNodeSize({ groups, label: 'Dev', model, grid: 10, portLabels: true });
+
+  // 期待値は仕様から: アイコン 8+24=32 / 名前の下端 6+14=20(型番があれば+14) / 上辺に番号があれば名前が10下がる / 下辺の番号の行 18 を足し、グリッドへ切り上げる
+  it('下辺だけ: 32+18=50 → 50', () => {
+    expect(withLabels([g('b', 'bottom', 8)]).h).toBe(50);
+  });
+
+  it('上辺と下辺: 10+32+18=60 → 60', () => {
+    expect(withLabels([g('t', 'top', 1), g('b', 'bottom', 8)]).h).toBe(60);
+  });
+
+  it('上辺と下辺で、型番もある: 10+34+18=62 → 70', () => {
+    expect(withLabels([g('t', 'top', 1), g('b', 'bottom', 8)], 'Model-X').h).toBe(70);
+  });
+
+  it('下辺にポートがなければ、番号の行が要らないので、標準のまま', () => {
+    expect(withLabels([g('t', 'top', 2), g('l', 'left', 2)]).h).toBe(size([g('t', 'top', 2), g('l', 'left', 2)]).h);
+  });
+
+  it('番号を表示しないときは、これまでと同じ', () => {
+    const groups = [g('t', 'top', 1), g('b', 'bottom', 8)];
+    expect(size(groups, 'Dev', 'Model-X').h).toBe(50);
+  });
+});

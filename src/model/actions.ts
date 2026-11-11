@@ -330,7 +330,10 @@ export function updateNode(
       const lostSet = new Set(lost);
       page.edges = page.edges.filter((e) => !lostSet.has(e.id));
     }
-    if (patch.showPortLabels !== undefined) node.showPortLabels = patch.showPortLabels;
+    if (patch.showPortLabels !== undefined) {
+      node.showPortLabels = patch.showPortLabels;
+      if (patch.showPortLabels) growToFit(node, doc); // 番号を出すときは、名前と重ならない高さまで広げる(小さくはしない。元に戻すで、1回で戻る)
+    }
     if (patch.label !== undefined) node.label = patch.label;
     if (patch.model !== undefined) node.model = patch.model;
     if ('count' in patch) {
@@ -445,7 +448,7 @@ function validGroups(doc: DiagramDocument, groups: readonly PortGroup[]): boolea
 /** ポート・名称・型番が収まる、機器の最小の大きさ(グリッドの倍数) */
 export function minNodeSize(node: DiagramNode, doc: DiagramDocument): { w: number; h: number } {
   const groups = node.portGroupsOverride ?? getTemplate(doc, node.templateId)?.portGroups ?? [];
-  return autoNodeSize({ groups, label: node.label, model: node.model, grid: doc.grid.size, units: node.count });
+  return autoNodeSize({ groups, label: node.label, model: node.model, grid: doc.grid.size, units: node.count, portLabels: node.showPortLabels === true });
 }
 
 function growToFit(node: DiagramNode, doc: DiagramDocument): void {

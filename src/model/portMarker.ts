@@ -24,6 +24,10 @@ export function markerSpec(direction: Direction, side: Side): MarkerSpec {
 // 画面とSVGで同じ余白と文字サイズにする。
 export const MULTI_OUTLINE_GAP = 2;
 export const PORT_LABEL_SIZE = 8;
+/** 上辺のポートの番号を出すとき、機器の名前とアイコンを下へずらす量(px)。番号が名前に重ならないようにする */
+export const TOP_LABEL_SHIFT = 10;
+/** 下辺のポートの番号が、マークの上に占める高さ(px。文字の高さ+余白) */
+export const BOTTOM_LABEL_ROW = 18;
 export function portLabelPosition(side: Side, x: number, y: number, markerSize: number): { x: number; y: number; align: 'left' | 'right' | 'center' } {
   const gap = markerSize / 2 + MULTI_OUTLINE_GAP + 2;
   if (side === 'left') return { x: x + gap, y, align: 'left' };

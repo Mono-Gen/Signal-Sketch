@@ -106,6 +106,24 @@ describe('updateNode', () => {
     expect(store.redo()).toBe(true);
     expect(node(store.doc, 'tap').showPortLabels).toBe(true);
   });
+  it('ポート番号を表示すると、名前と重ならない高さまで広がる(小さくはならず、元に戻すで1回で戻る)', () => {
+    const doc = fresh();
+    const n = node(doc, 'tap');
+    n.portGroupsOverride = [
+      { id: 't', signalType: 'LAN', direction: 'inout', side: 'top', count: 1, labelPrefix: 'U' },
+      { id: 'b', signalType: 'LAN', direction: 'inout', side: 'bottom', count: 4, labelPrefix: 'L' },
+    ];
+    n.h = 50; // 上下に番号を出すには、10+32+18=60 が要る
+    const store = new DocumentStore(doc);
+    expect(store.apply(updateNode(P, 'tap', { showPortLabels: true })).ok).toBe(true);
+    expect(node(store.doc, 'tap').h).toBe(60);
+    expect(store.undo()).toBe(true);
+    expect(node(store.doc, 'tap').h).toBe(50);
+    expect(store.redo()).toBe(true);
+    node(store.doc, 'tap').h = 100; // 大きくしておいた機器は、小さくしない
+    expect(store.apply(updateNode(P, 'tap', { showPortLabels: false })).ok).toBe(true);
+    expect(node(store.doc, 'tap').h).toBe(100);
+  });
   it('名称・型番・台数を変更できる', () => {
     const doc = fresh();
     expect(updateNode(P, 'tap', { label: '新名称', model: 'M-1', count: 3 })(doc).ok).toBe(true);
