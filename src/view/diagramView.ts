@@ -289,6 +289,11 @@ export class DiagramView {
     // 子セルを親の枠内へ押し込む補正を切る。入れたままだと左辺・上辺のポートだけが
     // 4px内側へずれ、辺の中央にあるはずの頂点が当たり判定から外れる(実ブラウザの検証で判明)。
     g.setConstrainChildren(false);
+    // 同じ理由で、子セルを入れた親を、子に合わせて広げる補正も切る。入れたままだと、右辺・下辺のポートが
+    // 機器の枠を幅・高さとも4px広げ、右辺・下辺のポートだけが枠の内側へ4px寄って見える(左辺・上辺は辺の上)。
+    // 画像の書き出しは、広げない大きさで描くため、画面と書き出しも食い違っていた(実ブラウザの検証で判明)。
+    g.setExtendParents(false);
+    g.setExtendParentsOnAdd(false);
     g.setAllowDanglingEdges(false); // 何もない所へ離した線を残さない
     g.setCellsDisconnectable(false); // 線の端を勝手に外せないようにする
     // 折りたたみは使わない(isCellFoldable)。有効のままだと、子(ポート・アイコン)を持つ機器ごとに、折りたたみの印の画像
