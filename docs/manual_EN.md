@@ -118,7 +118,7 @@ Select a device and the "Ports" section lists its port **groups**. Each group ha
 | Starting number | First displayed number, from 0 to 9999 |
 
 - "Add port" adds a group. Changes apply to that device only; other devices of the same kind are unchanged.
-- Right-click a port to remove it. To remove several on one device, select ports with Shift-drag and right-click one of them. Connected lines are counted in a confirmation. Numbers of the remaining ports do not change. Undo restores the removal, including its connections. For multiple units the same number is removed from every unit.
+- Right-click a port to remove it. To remove several on one device, select ports with Shift-drag and right-click one of them or press **Delete**. Connected lines are counted in a confirmation. Numbers of the remaining ports do not change. Undo restores the removal, including its connections. For multiple units the same number is removed from every unit.
 - A port marker is hollow when free and filled with the signal color when connected. **Hover** over a port to see its name.
 - **Move a single port**: hold Shift and drag the port. It is placed on the nearest side at a grid position. It cannot be placed where another port already is. "Reset port positions to automatic" in the panel undoes this.
 

@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import type { Action, ActionResult } from '../model/actions';
 import { removeItems } from '../model/actions';
+import { countRemovedPortEdges, removePorts } from '../model/portActions';
 import { copySelection, pasteClipboard, suggestPasteOffset } from '../model/clipboard';
 import type { ClipboardData } from '../model/clipboard';
 import type { DocumentStore } from '../state/store';
@@ -74,6 +75,23 @@ export function createClipboardCommands(deps: ClipboardCommandsDeps): ClipboardC
       if (data) pasteData(data, 1);
     },
     deleteSelection() {
+      // 枠で選んだポートがあるときは、機器や線より先に、そのポートを削除する(右クリックの「ポートを削除」と同じ)
+      const ports = view.getPortSelection();
+      if (ports.length > 0) {
+        const byNode = new Map<string, string[]>();
+        for (const p of ports) byNode.set(p.nodeId, [...(byNode.get(p.nodeId) ?? []), p.portId]);
+        const edgeCount = [...byNode].reduce((sum, [nodeId, ids]) => sum + countRemovedPortEdges(store.doc, pageId, nodeId, ids), 0);
+        if (edgeCount > 0 && !window.confirm(t('confirm.removePorts', { count: edgeCount }))) return;
+        // 複数の機器にまたがっても、元に戻す操作は1回でまとめて戻る。途中で失敗したら、全体を適用しない
+        apply((doc) => {
+          for (const [nodeId, ids] of byNode) {
+            const r = removePorts(pageId, nodeId, ids)(doc);
+            if (!r.ok) return r;
+          }
+          return { ok: true };
+        });
+        return;
+      }
       const sel = view.getSelection();
       if (sel.nodeIds.length === 0 && sel.edgeIds.length === 0 && sel.frameIds.length === 0 && sel.noteIds.length === 0) return;
       store.apply(removeItems(pageId, sel));
