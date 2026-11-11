@@ -159,6 +159,7 @@ function checkFields(doc: Record<string, unknown>): string[] {
       if (typeof n.w === 'number' && n.w <= 0) bad(`${w}.w は正の数である必要があります`);
       if (typeof n.h === 'number' && n.h <= 0) bad(`${w}.h は正の数である必要があります`);
       num(w, 'count', n.count, true);
+      if (n.showPortLabels !== undefined && typeof n.showPortLabels !== 'boolean') bad(`${w}.showPortLabels は真偽値である必要があります`);
       str(w, 'note', n.note, true);
       str(w, 'iconOverride', n.iconOverride, true);
       str(w, 'imageId', n.imageId, true);

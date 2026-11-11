@@ -79,6 +79,14 @@ describe('貼り付けの境界(iconRef・ずらし量)', () => {
 });
 
 describe('copySelection', () => {
+  it('ポート番号表示設定をコピーと貼り付けで保持する', () => {
+    const doc = fresh();
+    node(doc, 'sw').showPortLabels = true;
+    const data = copySelection(doc, P, { nodeIds: ['sw'] })!;
+    const result = paste(doc, data);
+    expect(result.ok).toBe(true);
+    expect(node(doc, result.createdNodeIds![0]).showPortLabels).toBe(true);
+  });
   it('欠番のある同一IDテンプレートへ通常の機器と接続を貼ると定義を分離する', () => {
     const source = fresh();
     const data = copySelection(source, P, { nodeIds: ['mute', 'sw'] })!;

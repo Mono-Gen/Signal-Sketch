@@ -110,13 +110,14 @@ Select a device and the "Ports" section lists its port **groups**. Each group ha
 | Item | Meaning |
 |---|---|
 | Signal | The signal type. It decides the color of lines and ports |
-| Direction | Input / Output / Input-output, shown by the marker shape (input = inward triangle, output = outward triangle, input-output = diamond) |
+| Direction | Input / Output / Input-output, shown by the marker shape (input = inward triangle, output = outward triangle, input-output = square) |
 | Position | Which side of the device the ports are on: left, right, top or bottom |
 | Count | Number of ports |
 | Connections | "One" or "Multiple" (normally one) |
 | Display name | The port's name. A group with a single port has no number ("LAN"); two or more are numbered ("LAN 1") |
 | Starting number | First displayed number, from 0 to 9999 |
 
+- Check "Show port numbers" to display port names beside the markers inside a single selected device. Multiple-connection ports have an additional outline.
 - "Add port" adds a group. Changes apply to that device only; other devices of the same kind are unchanged.
 - Right-click a port to remove it. To remove several on one device, select ports with Shift-drag and right-click one of them or press **Delete**. Connected lines are counted in a confirmation. Numbers of the remaining ports do not change. Undo restores the removal, including its connections. For multiple units the same number is removed from every unit.
 - A port marker is hollow when free and filled with the signal color when connected (when signals of the same family are connected, the line and both ports take the sub-signal's color; connections between different families keep each port's own color). **Hover** over a port to see its name.

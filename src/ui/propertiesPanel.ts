@@ -640,6 +640,13 @@ export class PropertiesPanel {
     const tpl = getTemplate(doc, node.templateId);
     const groups: PortGroup[] = tpl ? structuredClone(resolvePortGroups(tpl, node)) : [];
     const section = el('div', { className: 'section' }, [el('h3', { text: t('props.ports') })]);
+    if (!many) {
+      const checkbox = el('input', {
+        attrs: { type: 'checkbox', 'data-prop': 'show-port-labels', ...(node.showPortLabels ? { checked: '' } : {}) },
+        on: { change: (ev) => this.ctx.apply(updateNode(this.ctx.pageId, node.id, { showPortLabels: (ev.target as HTMLInputElement).checked })) },
+      });
+      section.append(field(t('props.showPortLabels'), checkbox));
+    }
 
     const commit = (next: PortGroup[]) => {
       next = next.map((group) => {

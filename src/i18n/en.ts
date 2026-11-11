@@ -232,6 +232,7 @@ const en: Record<MessageKey, string> = {
   'status.noteAdded': 'Note added. Edit the text in the right panel',
   'props.portsMixed': 'The selected devices have different port layouts, so they cannot be changed together (select devices with the same layout)',
   'props.portsBulkHint': 'The selected devices share the same port layout. Changes apply to all of them',
+  'props.showPortLabels': 'Show port numbers',
   'props.ports': 'Ports',
   'props.addGroup': 'Add ports',
   'props.signal': 'Signal',

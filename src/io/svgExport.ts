@@ -1,7 +1,7 @@
 import { imageBox, isImageDataUri } from '../model/images';
 import { getNodePorts, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
-import { markerSpec } from '../model/portMarker';
+import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
@@ -93,12 +93,12 @@ export function wrapText(text: string, maxWidth: number, measure: (t: string) =>
   return lines.length > 0 ? lines : [''];
 }
 
-/** ポートのマーク(三角形または菱形)の頂点。中心(cx, cy)、外接の大きさ size */
-function markerPoints(shape: 'triangle' | 'rhombus', dir: CompassDirection, cx: number, cy: number, size: number): string {
+/** ポートのマークの頂点。中心(cx, cy)、外接の大きさ size */
+function markerPoints(shape: 'triangle' | 'square', dir: CompassDirection, cx: number, cy: number, size: number): string {
   const h = size / 2;
   const pts: [number, number][] =
-    shape === 'rhombus'
-      ? [[cx, cy - h], [cx + h, cy], [cx, cy + h], [cx - h, cy]]
+    shape === 'square'
+      ? [[cx - h, cy - h], [cx + h, cy - h], [cx + h, cy + h], [cx - h, cy + h]]
       : dir === 'east'
         ? [[cx - h, cy - h], [cx + h, cy], [cx - h, cy + h]]
         : dir === 'west'
@@ -161,6 +161,14 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
     const color = isConnected ? signalColor(th, signals.get(portSignal.get(`${n.id}/${port.id}`) ?? '')?.color ?? signals.get(port.signalType)?.color ?? '#888888') : own;
     const spec = markerSpec(port.direction, pl.side);
     const fill = isConnected ? color : th.portEmptyFill;
+    if (port.multi) {
+      parts.push(`<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize + 2 * MULTI_OUTLINE_GAP)}" fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`);
+    }
+    if (n.showPortLabels) {
+      const pos = portLabelPosition(pl.side, n.x + pl.x, n.y + pl.y, markerSize);
+      const anchor = pos.align === 'left' ? 'start' : pos.align === 'right' ? 'end' : 'middle';
+      parts.push(`<text x="${num(pos.x)}" y="${num(pos.y)}" text-anchor="${anchor}" dominant-baseline="central" font-size="${PORT_LABEL_SIZE}" fill="${th.nodeText}" pointer-events="none">${esc(port.label)}</text>`);
+    }
     parts.push(
       `<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize)}" fill="${fill}" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>`,
     );

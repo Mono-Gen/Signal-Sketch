@@ -41,6 +41,16 @@ function valid(): DiagramDocument {
 }
 
 describe('validateDocument', () => {
+  it('ポート番号表示は省略または真偽値のみ許す', () => {
+    const doc = valid();
+    expect(validateDocument(doc).ok).toBe(true);
+    for (const value of [true, false]) {
+      doc.pages[0].nodes[0].showPortLabels = value;
+      expect(validateDocument(doc).ok).toBe(true);
+    }
+    (doc.pages[0].nodes[0] as unknown as Record<string, unknown>).showPortLabels = 'true';
+    expect(validateDocument(doc).ok).toBe(false);
+  });
   it('正しいドキュメントは ok', () => {
     expect(validateDocument(valid())).toEqual({ ok: true, errors: [] });
   });

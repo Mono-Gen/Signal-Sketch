@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DocumentStore } from '../../src/state/store';
 import { addNodeFromTemplate, lostEdgeIds, setPortGroups, updateNode } from '../../src/model/actions';
 import { validateDocument } from '../../src/model/validate';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
@@ -96,6 +97,15 @@ describe('addNodeFromTemplate', () => {
 });
 
 describe('updateNode', () => {
+  it('ポート番号表示は1回で元に戻せる', () => {
+    const store = new DocumentStore(fresh());
+    expect(store.apply(updateNode(P, 'tap', { showPortLabels: true })).ok).toBe(true);
+    expect(node(store.doc, 'tap').showPortLabels).toBe(true);
+    expect(store.undo()).toBe(true);
+    expect(node(store.doc, 'tap').showPortLabels).toBeUndefined();
+    expect(store.redo()).toBe(true);
+    expect(node(store.doc, 'tap').showPortLabels).toBe(true);
+  });
   it('名称・型番・台数を変更できる', () => {
     const doc = fresh();
     expect(updateNode(P, 'tap', { label: '新名称', model: 'M-1', count: 3 })(doc).ok).toBe(true);

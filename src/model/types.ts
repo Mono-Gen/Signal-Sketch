@@ -65,6 +65,7 @@ export interface DiagramNode {
   h: number;
   /** 台数表記(×N台) */
   count?: number;
+  showPortLabels?: boolean;
   iconOverride?: string;
   /** 機器の中に表示する画像(図の assets の ID)。なければ、種類ごとの小さなアイコンを出す */
   imageId?: string;

@@ -123,6 +123,8 @@
     .check-item.error { border-left: 4px solid var(--err); }
     .check-head { font-weight: 600; }
     .check-msg { color: var(--muted); font-size: 12px; }
+    /* ポートの飾り(複数接続の外枠・番号の文字)は、操作の対象にしない。子の要素まで、属性より強く打ち消す */
+    .port-deco, .port-deco * { pointer-events: none !important; }
     .signal-row { display: grid; grid-template-columns: 32px 1fr auto auto auto auto; gap: 4px; align-items: center; }
     .signal-row .color-input { width: 32px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--control-bg); }
     .signal-row button { padding: 3px 6px; white-space: nowrap; }

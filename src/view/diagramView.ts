@@ -1,7 +1,7 @@
 import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph, InternalEvent, Point, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
-import { markerSpec } from '../model/portMarker';
+import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition } from '../model/portMarker';
 import { connectionIssues, planConnectionColors } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
@@ -72,6 +72,7 @@ const SIDE_TO_CONSTRAINT = { left: 'west', right: 'east', top: 'north', bottom: 
  */
 export class DiagramView {
   private readonly graph: Graph;
+  private readonly portDecorations = new WeakSet<Cell>();
   private readonly portInfo = new Map<string, PortRef>();
   private readonly nodeByCell = new Map<string, string>();
   /** 直前のポインタ操作を離したとき、Shift が押されていたか(機器の変形で、画像の縦横比に合わせるかの判定) */
@@ -268,6 +269,9 @@ export class DiagramView {
 
   private configure(): void {
     const g = this.graph;
+    const getCellAt = g.getCellAt.bind(g);
+    g.getCellAt = (x, y, parent, vertices, edges, ignore) => getCellAt(x, y, parent, vertices, edges,
+      (state: CellState, px: number, py: number) => this.portDecorations.has(state.cell) || Boolean(ignore?.(state, px, py)));
     g.setConnectable(true);
     // maxGraph のパン(右ドラッグ等)は表示の平行移動を変え、座標変換を狂わせるので使わない。
     // 移動は外側のスクロール(スクロールバー・ホイール・中ボタンドラッグ)で行う。
@@ -476,6 +480,7 @@ export class DiagramView {
     g.setGridEnabled(doc.grid.enabled);
     g.setGridSize(doc.grid.size);
 
+    const decorations: Cell[] = [];
     g.batchUpdate(() => {
       g.removeCells(g.getChildCells(parent, true, true), true);
       this.portInfo.clear();
@@ -611,13 +616,36 @@ export class DiagramView {
           const spec = markerSpec(port.direction, pl.side);
           const cellId = `p:${n.id}/${port.id}`;
           const isConnected = connected.has(`${n.id}/${port.id}`);
+          if (port.multi) {
+            const outline = g.insertVertex({
+              parent: nodeCell,
+              position: [pl.x - markerSize / 2 - MULTI_OUTLINE_GAP, pl.y - markerSize / 2 - MULTI_OUTLINE_GAP],
+              size: [markerSize + 2 * MULTI_OUTLINE_GAP, markerSize + 2 * MULTI_OUTLINE_GAP],
+              style: { shape: spec.shape === 'square' ? 'rectangle' : spec.shape, direction: spec.direction, fillColor: 'none', strokeColor: isConnected ? color : own, strokeWidth: 1, pointerEvents: false },
+            });
+            outline.setConnectable(false);
+            this.portDecorations.add(outline);
+            decorations.push(outline);
+          }
+          if (n.showPortLabels) {
+            const pos = portLabelPosition(pl.side, pl.x, pl.y, markerSize);
+            const width = Math.max(PORT_LABEL_SIZE, Array.from(port.label).length * PORT_LABEL_SIZE);
+            const x = pos.align === 'left' ? pos.x : pos.align === 'right' ? pos.x - width : pos.x - width / 2;
+            const label = g.insertVertex({
+              parent: nodeCell, value: escapeHtml(port.label), position: [x, pos.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
+              style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pos.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
+            });
+            label.setConnectable(false);
+            this.portDecorations.add(label);
+            decorations.push(label);
+          }
           const cell = g.insertVertex({
             parent: nodeCell,
             id: cellId,
             position: [pl.x - markerSize / 2, pl.y - markerSize / 2],
             size: [markerSize, markerSize],
             style: {
-              shape: spec.shape,
+              shape: spec.shape === 'square' ? 'rectangle' : spec.shape,
               direction: spec.direction,
               // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
               fillColor: isConnected ? color : th.portEmptyFill,
@@ -674,6 +702,14 @@ export class DiagramView {
       g.orderCells(true, edgeCells);
       g.orderCells(true, groupCells);
     });
+    for (const cell of decorations) {
+      const state = g.getView().getState(cell);
+      // 親だけを none にしても、子の要素(輪郭の見えない当たり判定・文字)の pointer-events 属性が残り、隣のポートの操作を奪う。
+      // 子まで効かせるため CSS(index.html の .port-deco)で打ち消す。印は根の要素に付け、再描画(拡大縮小)でも残る
+      for (const node of [state?.shape?.node, state?.text?.node]) {
+        if (node) (node as HTMLElement | SVGElement).classList.add('port-deco');
+      }
+    }
   }
 
   private issueStyle(a: Port | undefined, b: Port | undefined, signals: readonly SignalType[]): { dashed?: boolean; dashPattern?: string } {

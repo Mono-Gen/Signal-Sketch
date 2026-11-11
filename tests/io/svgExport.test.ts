@@ -37,6 +37,30 @@ describe('roundedPath', () => {
 });
 
 describe('buildSvg', () => {
+  it('複数接続の四角形には外枠が付き、番号表示は欠番と開始番号に従う', () => {
+    const doc = createSampleDocument();
+    const n = doc.pages[0].nodes.find((v) => v.id === 'sw')!;
+    n.showPortLabels = true;
+    n.portGroupsOverride = [
+      { id: 'a', signalType: 'LAN', direction: 'inout', side: 'left', count: 3, labelPrefix: 'P', startNumber: 5, skipped: [2], multi: true },
+      { id: 'b', signalType: 'LAN', direction: 'inout', side: 'right', count: 1, labelPrefix: 'Only' },
+    ];
+    doc.pages[0].nodes = [n];
+    doc.pages[0].edges = [];
+    const svg = buildSvg(doc, P, opts(doc));
+    expect(count(svg, /<polygon /g)).toBe(5);
+    expect(count(svg, /<polygon[^>]*fill="none"/g)).toBe(2);
+    expect(svg).toContain('>P5</text>');
+    expect(svg).not.toContain('>P6</text>');
+    expect(svg).toContain('>P7</text>');
+    expect(svg).toContain('>Only</text>');
+    const polygon = svg.match(/<polygon points="([^"]+)"/)![1].split(' ').map((p) => p.split(',').map(Number));
+    expect(polygon).toHaveLength(4);
+    expect(polygon[0][1]).toBe(polygon[1][1]);
+    expect(polygon[1][0]).toBe(polygon[2][0]);
+    n.showPortLabels = false;
+    expect(buildSvg(doc, P, opts(doc))).not.toContain('>P5</text>');
+  });
   it('暗い信号色を線・ポート・凡例で同じように補正し、空きポートを用紙色にする', () => {
     const doc = createSampleDocument();
     doc.signalTypes.find((s) => s.id === 'LAN')!.color = '#141a26';

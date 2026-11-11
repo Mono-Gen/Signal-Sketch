@@ -231,6 +231,7 @@ const ja = {
   'status.noteAdded': 'メモを追加しました。右のパネルで本文を書き換えられます',
   'props.portsMixed': '選んだ機器のポート構成が違うため、まとめては変えられません(同じポート構成の機器だけを選んでください)',
   'props.portsBulkHint': '選んだ機器はポート構成が同じです。変更は全員に反映します',
+  'props.showPortLabels': 'ポート番号を表示',
   'props.ports': 'ポート',
   'props.addGroup': 'ポートを追加',
   'props.signal': '信号',

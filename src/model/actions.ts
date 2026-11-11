@@ -306,7 +306,7 @@ function ensureSignalTypes(doc: DiagramDocument, groups: readonly PortGroup[]): 
 export function updateNode(
   pageId: string,
   nodeId: string,
-  patch: { label?: string; model?: string; count?: number | undefined },
+  patch: { label?: string; model?: string; count?: number | undefined; showPortLabels?: boolean },
   options: { removeOrphanEdges?: boolean } = {},
 ): Action {
   return (doc) => {
@@ -314,6 +314,7 @@ export function updateNode(
     if (!page) return fail('unknown-page');
     const node = page.nodes.find((n) => n.id === nodeId);
     if (!node) return fail('unknown-node');
+    if (patch.showPortLabels !== undefined && typeof patch.showPortLabels !== 'boolean') return fail('invalid-value');
     if ('count' in patch && patch.count !== undefined && (!Number.isInteger(patch.count) || patch.count < 1)) {
       return fail('invalid-value');
     }
@@ -329,6 +330,7 @@ export function updateNode(
       const lostSet = new Set(lost);
       page.edges = page.edges.filter((e) => !lostSet.has(e.id));
     }
+    if (patch.showPortLabels !== undefined) node.showPortLabels = patch.showPortLabels;
     if (patch.label !== undefined) node.label = patch.label;
     if (patch.model !== undefined) node.model = patch.model;
     if ('count' in patch) {
