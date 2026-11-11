@@ -1,7 +1,7 @@
 import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph, InternalEvent, Point, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
-import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition } from '../model/portMarker';
+import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
 import { connectionIssues, planConnectionColors } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
@@ -629,10 +629,11 @@ export class DiagramView {
           }
           if (n.showPortLabels) {
             const pos = portLabelPosition(pl.side, pl.x, pl.y, markerSize);
-            const width = Math.max(PORT_LABEL_SIZE, Array.from(port.label).length * PORT_LABEL_SIZE);
+            const text = portLabelText(port, pl.side);
+            const width = Math.max(PORT_LABEL_SIZE, Array.from(text).length * PORT_LABEL_SIZE);
             const x = pos.align === 'left' ? pos.x : pos.align === 'right' ? pos.x - width : pos.x - width / 2;
             const label = g.insertVertex({
-              parent: nodeCell, value: escapeHtml(port.label), position: [x, pos.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
+              parent: nodeCell, value: escapeHtml(text), position: [x, pos.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
               style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pos.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
             });
             label.setConnectable(false);

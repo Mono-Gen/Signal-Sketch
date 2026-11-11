@@ -7,6 +7,8 @@ export interface Port {
   /** グループ内の番号(1始まり) */
   index: number;
   label: string;
+  /** 番号だけの短い表示名(ポートが1つだけのグループは label と同じ)。上辺・下辺では、隣のポートと文字が重ならないよう、図にはこちらを出す */
+  shortLabel?: string;
   signalType: string;
   direction: Direction;
   side: Side;
@@ -111,6 +113,7 @@ export function expandPortGroups(groups: readonly PortGroup[]): Port[] {
         groupId: g.id,
         index: n,
         label: portLabel(g, n),
+        shortLabel: g.count === 1 ? portLabel(g, n) : String((g.startNumber ?? 1) + n - 1),
         signalType: g.signalType,
         direction: g.direction,
         side: g.side,

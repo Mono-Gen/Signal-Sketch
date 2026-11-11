@@ -1,7 +1,7 @@
 import { imageBox, isImageDataUri } from '../model/images';
 import { getNodePorts, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
-import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition } from '../model/portMarker';
+import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
@@ -167,7 +167,7 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
     if (n.showPortLabels) {
       const pos = portLabelPosition(pl.side, n.x + pl.x, n.y + pl.y, markerSize);
       const anchor = pos.align === 'left' ? 'start' : pos.align === 'right' ? 'end' : 'middle';
-      parts.push(`<text x="${num(pos.x)}" y="${num(pos.y)}" text-anchor="${anchor}" dominant-baseline="central" font-size="${PORT_LABEL_SIZE}" fill="${th.nodeText}" pointer-events="none">${esc(port.label)}</text>`);
+      parts.push(`<text x="${num(pos.x)}" y="${num(pos.y)}" text-anchor="${anchor}" dominant-baseline="central" font-size="${PORT_LABEL_SIZE}" fill="${th.nodeText}" pointer-events="none">${esc(portLabelText(port, pl.side))}</text>`);
     }
     parts.push(
       `<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize)}" fill="${fill}" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>`,

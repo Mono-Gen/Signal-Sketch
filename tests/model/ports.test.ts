@@ -127,3 +127,12 @@ describe('portLabel(表示名の番号)', () => {
     expect(ports[0].label).toBe('LAN');
   });
 });
+
+it('短い表示名: 複数ポートのグループは番号だけ(開始番号を反映)、1つだけのグループは名前のまま', () => {
+  const ports = expandPortGroups([
+    { id: 'a', signalType: 'LAN', direction: 'inout', side: 'bottom', count: 3, labelPrefix: 'LAN', startNumber: 5 },
+    { id: 'b', signalType: 'HDMI', direction: 'in', side: 'left', count: 1, labelPrefix: 'HDMI' },
+  ]);
+  expect(ports.map((p) => p.shortLabel)).toEqual(['5', '6', '7', 'HDMI']);
+  expect(ports.map((p) => p.label)).toEqual(['LAN5', 'LAN6', 'LAN7', 'HDMI']);
+});

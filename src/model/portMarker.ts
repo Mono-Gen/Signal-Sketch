@@ -31,3 +31,11 @@ export function portLabelPosition(side: Side, x: number, y: number, markerSize: 
   if (side === 'top') return { x, y: y + gap + PORT_LABEL_SIZE / 2, align: 'center' };
   return { x, y: y - gap - PORT_LABEL_SIZE / 2, align: 'center' };
 }
+
+/**
+ * 図の上に出すポートの文字。上辺・下辺は、ポートが1グリッドずつ並ぶため、接頭辞を除いた番号だけにする
+ * (「LAN1」「LAN2」だと隣と重なって読めない)。左右の辺は縦に並ぶので、名前の全体を出す。
+ */
+export function portLabelText(port: { label: string; shortLabel?: string }, side: Side): string {
+  return side === 'top' || side === 'bottom' ? (port.shortLabel ?? port.label) : port.label;
+}
