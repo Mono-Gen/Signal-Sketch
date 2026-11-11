@@ -16,12 +16,13 @@ export const HEADER_HEIGHT = 30;
 const SIDES: readonly Side[] = ['left', 'right', 'top', 'bottom'];
 
 /** 辺に沿って置ける範囲(端の余白とヘッダを除く)。左右はY、上下はXの範囲 */
-export function alongRange(side: Side, size: { w: number; h: number }, grid: number, headerExtra = 0): { min: number; max: number } {
+export function alongRange(side: Side, size: { w: number; h: number }, grid: number, headerExtra = 0, footerExtra = 0): { min: number; max: number } {
   const vertical = side === 'left' || side === 'right';
   const length = vertical ? size.h : size.w;
   // 上下の辺は端から1グリッドの余白だけ空ける。24ポートのスイッチ(幅260)が1段に収まるため
   const min = vertical ? ceilToGrid(HEADER_HEIGHT + headerExtra, grid) : grid;
-  return { min, max: Math.max(min, length - grid) };
+  // 左右の辺の下端は、下辺の番号の行(footerExtra)を避ける
+  return { min, max: Math.max(min, length - grid - (vertical ? footerExtra : 0)) };
 }
 
 /**
@@ -46,6 +47,7 @@ export function nearestSide(local: { x: number; y: number }, size: { w: number; 
  * - manual に指定のあるポートは、自動配置の対象から外し、指定された辺・位置の辺上へ置く
  *   (範囲外の位置は辺の範囲へ丸める)。
  * - headerExtra: 左右の辺の開始位置を、ヘッダの分からさらに下げる量(ポートの番号を出すとき、アイコンと重ならないように)。
+ * - footerExtra: 左右の辺の下端を、さらに上げる量(下辺の番号の行と重ならないように)。
  */
 export function layoutPorts(
   ports: readonly Port[],
@@ -53,6 +55,7 @@ export function layoutPorts(
   grid: number,
   manual: Readonly<Record<string, ManualPortPlacement>> = {},
   headerExtra = 0,
+  footerExtra = 0,
 ): PortPlacement[] {
   const result: PortPlacement[] = [];
   const isManual = (p: Port) => Object.prototype.hasOwnProperty.call(manual, p.id);
@@ -60,8 +63,8 @@ export function layoutPorts(
     const list = ports.filter((p) => p.side === side && !isManual(p));
     if (list.length === 0) continue;
     const vertical = side === 'left' || side === 'right';
-    const { min: start } = alongRange(side, size, grid, headerExtra);
-    const endMargin = grid;
+    const { min: start } = alongRange(side, size, grid, headerExtra, footerExtra);
+    const endMargin = grid + (vertical ? footerExtra : 0);
     const length = vertical ? size.h : size.w;
     const capacity = Math.max(1, Math.floor((length - start - endMargin) / grid) + 1);
 
@@ -91,7 +94,7 @@ export function layoutPorts(
   for (const p of ports) {
     if (!isManual(p)) continue;
     const m = manual[p.id];
-    const { min, max } = alongRange(m.side, size, grid, headerExtra);
+    const { min, max } = alongRange(m.side, size, grid, headerExtra, footerExtra);
     const pos = Math.min(max, Math.max(min, m.pos));
     result.push({
       portId: p.id,

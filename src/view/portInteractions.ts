@@ -4,7 +4,7 @@ import type { BulkPlan } from '../model/bulkConnect';
 import { connectCandidates } from '../model/connectCandidates';
 import { alongRange, nearestSide } from '../model/portLayout';
 import { frameOfNode } from '../model/frames';
-import { findPortByRef, getPage, layoutNodePorts, portHeaderExtra } from '../model/query';
+import { findPortByRef, getPage, layoutNodePorts, portFooterExtra, portHeaderExtra } from '../model/query';
 import type { PortRef, Side } from '../model/types';
 import type { DocumentStore } from '../state/store';
 import { signalColor } from './theme';
@@ -369,7 +369,7 @@ export class PortInteractions {
         const showGhost = (e: PointerEvent) => {
           const { node, local, side } = localOf(e, ref.nodeId);
           const grid = this.doc.grid.size;
-          const { min, max } = alongRange(side, { w: node.w, h: node.h }, grid, portHeaderExtra(this.doc, node));
+          const { min, max } = alongRange(side, { w: node.w, h: node.h }, grid, portHeaderExtra(this.doc, node), portFooterExtra(this.doc, node));
           const raw = side === 'left' || side === 'right' ? local.y : local.x;
           const pos = Math.min(max, Math.max(min, Math.round(raw / grid) * grid));
           const x = node.x + (side === 'left' ? 0 : side === 'right' ? node.w : pos);

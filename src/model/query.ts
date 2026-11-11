@@ -1,5 +1,6 @@
 import { layoutPorts } from './portLayout';
-import { SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
+import { ceilToGrid } from './grid';
+import { BOTTOM_LABEL_ROW, SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
 import type { PortPlacement } from './portLayout';
 import { expandPortGroups, expandUnits, resolvePortGroups } from './ports';
 import type { Port } from './ports';
@@ -27,7 +28,7 @@ export function findPortByRef(doc: DiagramDocument, ref: PortRef): Port | undefi
 
 /** 機器のポートの配置(個別に動かした位置を考慮)。線が出る向きも、ここで決まる辺に従う */
 export function layoutNodePorts(doc: DiagramDocument, node: DiagramNode): PortPlacement[] {
-  return layoutPorts(getNodePorts(doc, node), { w: node.w, h: node.h }, doc.grid.size, node.portPlacements, portHeaderExtra(doc, node));
+  return layoutPorts(getNodePorts(doc, node), { w: node.w, h: node.h }, doc.grid.size, node.portPlacements, portHeaderExtra(doc, node), portFooterExtra(doc, node));
 }
 
 export { SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
@@ -41,6 +42,13 @@ export function headerShift(doc: DiagramDocument, node: DiagramNode): number {
 }
 
 /** 左右の辺のポートの開始位置を、番号を出すときに下げる量(アイコン・名前のずれ分も含む) */
+/** 番号を出すとき、下辺にポートがあれば、左右の辺の下端を上げる量(下辺の番号の行を避ける) */
+export function portFooterExtra(doc: DiagramDocument, node: DiagramNode): number {
+  if (!node.showPortLabels) return 0;
+  const onBottom = getNodePorts(doc, node).some((p) => (node.portPlacements?.[p.id]?.side ?? p.side) === 'bottom');
+  return onBottom ? ceilToGrid(BOTTOM_LABEL_ROW, doc.grid.size) : 0;
+}
+
 export function portHeaderExtra(doc: DiagramDocument, node: DiagramNode): number {
   return node.showPortLabels ? SIDE_LABEL_EXTRA + headerShift(doc, node) : 0;
 }

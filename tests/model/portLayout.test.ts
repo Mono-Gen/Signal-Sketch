@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutPorts } from '../../src/model/portLayout';
+import { alongRange, layoutPorts } from '../../src/model/portLayout';
 import { expandPortGroups } from '../../src/model/ports';
 import type { PortGroup, Side } from '../../src/model/types';
 
@@ -115,5 +115,19 @@ describe('layoutPorts(headerExtra: 番号を出すときの、左右の開始位
     expect(plain.find((p) => p.portId === 'l-1')!.y).toBe(30);
     expect(extra.find((p) => p.portId === 'l-1')!.y).toBe(40);
     expect(extra.find((p) => p.portId === 'b-1')).toEqual(plain.find((p) => p.portId === 'b-1'));
+  });
+});
+
+describe('footerExtra(番号を出すときの、左右の下端)', () => {
+  it('左右の辺の下端が、下辺の番号の行の分だけ上がる(上下の辺は変わらない)', () => {
+    expect(alongRange('left', { w: 120, h: 80 }, 10).max).toBe(70);
+    expect(alongRange('left', { w: 120, h: 80 }, 10, 0, 20).max).toBe(50);
+    expect(alongRange('bottom', { w: 120, h: 80 }, 10, 0, 20).max).toBe(110);
+  });
+
+  it('手で動かした左のポートを、下辺の番号の行の手前へ丸める', () => {
+    const port = { id: 'l-1', groupId: 'l', index: 1, label: 'L1', signalType: 'LAN', direction: 'inout', side: 'left', unit: 1, multi: false } as const;
+    const placed = layoutPorts([port], { w: 120, h: 80 }, 10, { 'l-1': { side: 'left', pos: 200 } }, 0, 20);
+    expect(placed[0].y).toBe(50);
   });
 });

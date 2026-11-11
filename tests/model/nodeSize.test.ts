@@ -120,3 +120,11 @@ describe('DEFAULT_NODE_HEIGHT(新しく置く機器の標準の高さ)', () => {
     expect(size([])).toEqual({ w: 120, h: 50 });
   });
 });
+
+describe('autoNodeSize(左右と下辺のポートに番号を出すとき)', () => {
+  it('左右2つ+下辺: 開始40 + 10 + 余白10 + 下辺の番号の行の分20 = 80(番号なしは50)', () => {
+    const groups = [g('l', 'left', 2), g('b', 'bottom', 4)];
+    expect(autoNodeSize({ groups, label: 'Dev', model: '', grid: 10 }).h).toBe(50);
+    expect(autoNodeSize({ groups, label: 'Dev', model: '', grid: 10, portLabels: true }).h).toBe(80);
+  });
+});

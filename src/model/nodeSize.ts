@@ -63,7 +63,9 @@ export function autoNodeSize(input: SizeInput): { w: number; h: number } {
   // 左右の辺: 開始位置(ヘッダ分。番号を出すときは、さらに下げる) + 間隔 x (枠数-1) + 終端の余白(1グリッド)
   const hasTopPorts = groups.some((g) => g.side === 'top' && g.count > 0);
   const headerExtra = input.portLabels ? SIDE_LABEL_EXTRA + (hasTopPorts ? TOP_LABEL_SHIFT : 0) : 0;
-  const neededH = vertical > 0 ? ceilToGrid(ceilToGrid(HEADER_HEIGHT + headerExtra, grid) + (vertical - 1) * grid + grid, grid) : 0;
+  const hasBottomPorts = groups.some((g) => g.side === 'bottom' && g.count > 0);
+  const footerExtra = input.portLabels && hasBottomPorts ? ceilToGrid(BOTTOM_LABEL_ROW, grid) : 0; // 下辺の番号の行を避ける
+  const neededH = vertical > 0 ? ceilToGrid(ceilToGrid(HEADER_HEIGHT + headerExtra, grid) + (vertical - 1) * grid + grid + footerExtra, grid) : 0;
   // 上下の辺: 両端1グリッドずつの余白 + 間隔 x (枠数-1)
   const neededPortW = horizontal > 0 ? (horizontal + 1) * grid : 0;
   const neededTextW = ceilToGrid(inset + Math.max(estimateTextWidth(label), estimateTextWidth(model)), grid);
