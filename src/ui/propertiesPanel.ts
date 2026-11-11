@@ -10,7 +10,6 @@ import { uniqueId } from '../model/ids';
 import { PAGE_SIZE_PRESETS, presetIndexOf } from '../model/pageSize';
 import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
-import { restorePorts } from '../model/portActions';
 import { addSignalType, isHexColor, moveSignalType, orderedSignalTypes, reassignAndRemoveSignalType, recreateSignalColor, removeSignalType, setSignalParent, signalUsageDetails, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
@@ -418,7 +417,7 @@ export class PropertiesPanel {
       const i = peers.indexOf(s);
       const usage = signalUsageDetails(doc, s.id);
       const children = doc.signalTypes.filter((x) => x.parent === s.id);
-      const row = el('div', { className: 'signal-row', attrs: { 'data-signal': s.id, ...(s.parent ? { style: 'margin-left: 20px' } : {}) } });
+      const row = el('div', { className: 'legend-row', attrs: { 'data-signal': s.id, ...(s.parent ? { style: 'margin-left: 20px' } : {}) } });
       const color = el('input', {
         className: 'color-input',
         attrs: { type: 'color', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color' },
@@ -446,14 +445,16 @@ export class PropertiesPanel {
       parent.addEventListener('change', () => { if (!this.ctx.apply(setSignalParent(s.id, parent.value || null)).ok) this.update(null); });
       const button = (text: string, action: string, disabled: boolean, click: () => void, aria = text) =>
         el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click } });
-      row.append(color, colorText, label, line, parent,
+      const main = el('div', { className: 'legend-row-main' }, [color, colorText, label,
         button(t('legend.up'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1)), t('legend.upLabel')),
-        button(t('legend.down'), 'signal-down', i === peers.length - 1, () => this.ctx.apply(moveSignalType(s.id, 1)), t('legend.downLabel')));
-      if (s.parent) row.append(button(t('legend.recreate'), 'signal-recreate', false, () => {
+        button(t('legend.down'), 'signal-down', i === peers.length - 1, () => this.ctx.apply(moveSignalType(s.id, 1)), t('legend.downLabel'))]);
+      const sub = el('div', { className: 'legend-row-sub' }, [line, parent]);
+      row.append(main, sub);
+      if (s.parent) sub.append(button(t('legend.recreate'), 'signal-recreate', false, () => {
         this.ctx.apply(recreateSignalColor(s.id));
       }));
-      else row.append(button(t('legend.addChild'), 'signal-add-child', false, () => this.ctx.apply(addSignalType(t('legend.newLabel'), s.color, s.id))));
-      row.append(button(t('legend.remove'), 'signal-remove', false, () => {
+      else sub.append(button(t('legend.addChild'), 'signal-add-child', false, () => this.ctx.apply(addSignalType(t('legend.newLabel'), s.color, s.id))));
+      sub.append(button(t('legend.remove'), 'signal-remove', false, () => {
         if (children.length) { this.ctx.setStatus('error', t('legend.children')); return; }
         if (!usage.devices.length && !usage.templates.length) { this.ctx.apply(removeSignalType(s.id)); return; }
         const confirmation = el('div', { attrs: { role: 'group', 'aria-label': t('legend.reassign') } });
@@ -700,9 +701,6 @@ export class PropertiesPanel {
           on: { click: () => commit(groups.filter((_, j) => j !== i)) },
         }),
       ]);
-      if (!many) for (const index of g.skipped ?? []) {
-        row.append(el('button', { text: t('props.restorePort', { number: (g.startNumber ?? 1) + index - 1 }), attrs: { type: 'button', 'data-action': 'restore-port' }, on: { click: () => this.ctx.apply(restorePorts(this.ctx.pageId, node.id, g.id, [index])) } }));
-      }
       section.append(row);
     });
 

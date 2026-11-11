@@ -4,7 +4,6 @@ const ja = {
   'menu.removePort': 'このポートを削除',
   'menu.removeSelectedPorts': '選択したポート{count}個を削除',
   'props.startNumber': '開始番号',
-  'props.restorePort': '{number}を戻す',
   'toolbar.new': '新規',
   'toolbar.open': '開く',
   'toolbar.save': '保存',
