@@ -2,6 +2,7 @@ import { APP_NAME } from '../app/appInfo';
 import { getLanguage, t } from '../i18n';
 import type { MessageKey } from '../i18n';
 import { diagnose } from '../model/diagnostics';
+import { orderedSignalTypes } from '../model/signalActions';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import type { DocumentStore } from '../state/store';
 import type { DiagramView } from '../view/diagramView';
@@ -45,7 +46,19 @@ export function createAppChrome(deps: AppChromeDeps): AppChrome {
     const title = document.createElement('strong');
     title.textContent = t('legend.title');
     legendEl.append(title);
-    for (const s of store.doc.signalTypes) {
+    const ordered = orderedSignalTypes(store.doc.signalTypes);
+    let group: HTMLElement | undefined;
+    for (const s of ordered) {
+      if (!s.parent) {
+        group = undefined;
+        if (ordered.some((child) => child.parent === s.id)) {
+          group = document.createElement('span');
+          group.style.display = 'inline-flex';
+          group.style.flexDirection = 'column';
+          group.style.alignItems = 'flex-start';
+          legendEl.append(group);
+        }
+      }
       const item = document.createElement('span');
       item.className = 'item';
       const swatch = document.createElement('span');
@@ -58,7 +71,10 @@ export function createAppChrome(deps: AppChromeDeps): AppChrome {
         swatch.style.background = `repeating-linear-gradient(90deg, ${color} 0 ${on}px, transparent ${on}px ${on + off}px)`;
       } else swatch.style.background = color;
       item.append(swatch, document.createTextNode(s.label));
-      legendEl.append(item);
+      if (s.parent) {
+        item.style.marginLeft = '16px';
+      }
+      (group ?? legendEl).append(item);
     }
   }
 

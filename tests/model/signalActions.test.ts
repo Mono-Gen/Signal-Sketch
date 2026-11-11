@@ -178,6 +178,6 @@ describe('信号の線の種類(lineStyle)', () => {
     expect(svg).toContain(`stroke-dasharray="${DASH_PATTERN.dashed}"`);
     expect(svg).toContain(`stroke-dasharray="${DASH_PATTERN.dotted}"`);
     const solidLegendLines = (svg.match(/<line [^>]*stroke-width="3"[^>]*>/g) ?? []).filter((l) => !l.includes('stroke-dasharray'));
-    expect(solidLegendLines.length).toBe(doc.signalTypes.length - 2);
+    expect(solidLegendLines.length).toBe(3);
   });
 });

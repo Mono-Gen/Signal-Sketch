@@ -1,7 +1,11 @@
 import { isDirectionMismatch } from './ports';
 import type { Port } from './ports';
 import { getNodePorts } from './query';
-import type { DiagramDocument } from './types';
+import type { DiagramDocument, SignalType } from './types';
+
+export function rootSignalId(signals: readonly SignalType[], id: string): string {
+  return signals.find((s) => s.id === id)?.parent ?? id;
+}
 
 /** 接続1本に対する指摘の種類 */
 export type ConnectionIssue = 'signal-mismatch' | 'direction-mismatch';
@@ -10,9 +14,9 @@ export type ConnectionIssue = 'signal-mismatch' | 'direction-mismatch';
  * 2つのポートの接続に対する指摘。接続時の警告・線の表示・確認事項の一覧が、
  * すべてこの判定を使う(食い違わないよう、判定をここ1か所にする)。
  */
-export function connectionIssues(a: Pick<Port, 'signalType' | 'direction' | 'multi'>, b: Pick<Port, 'signalType' | 'direction' | 'multi'>): ConnectionIssue[] {
+export function connectionIssues(a: Pick<Port, 'signalType' | 'direction' | 'multi'>, b: Pick<Port, 'signalType' | 'direction' | 'multi'>, signals: readonly SignalType[] = []): ConnectionIssue[] {
   const issues: ConnectionIssue[] = [];
-  if (a.signalType !== b.signalType) issues.push('signal-mismatch');
+  if (rootSignalId(signals, a.signalType) !== rootSignalId(signals, b.signalType)) issues.push('signal-mismatch');
   if (isDirectionMismatch(a, b)) issues.push('direction-mismatch');
   return issues;
 }
@@ -51,7 +55,7 @@ export function diagnose(doc: DiagramDocument): Diagnostic[] {
         errors.push({ ...base, key: `${e.id}:broken-edge`, severity: 'error', code: 'broken-edge' });
         continue;
       }
-      for (const code of connectionIssues(pa, pb)) {
+      for (const code of connectionIssues(pa, pb, doc.signalTypes)) {
         warnings.push({ ...base, key: `${e.id}:${code}`, severity: 'warning', code });
       }
     }

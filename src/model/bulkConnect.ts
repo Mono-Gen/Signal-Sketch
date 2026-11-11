@@ -1,4 +1,4 @@
-import { connectionIssues } from './diagnostics';
+import { connectionIssues, rootSignalId } from './diagnostics';
 import { followersInFrame } from './frames';
 import type { Port } from './ports';
 import { getNodePorts, getPage, layoutNodePorts } from './query';
@@ -131,7 +131,7 @@ export function planBulkConnect(doc: DiagramDocument, pageId: string, selected: 
   for (const other of followersInFrame(page, node)) {
     if (sourceNodeIds.has(other.id)) continue; // 送り側の機器へは進めない(自分自身につながないため)
     for (const p of getNodePorts(doc, other)) {
-      if (p.groupId !== dropPort.port.groupId || p.signalType !== dropPort.port.signalType || p.direction !== dropPort.port.direction) continue;
+      if (p.groupId !== dropPort.port.groupId || rootSignalId(doc.signalTypes, p.signalType) !== rootSignalId(doc.signalTypes, dropPort.port.signalType) || p.direction !== dropPort.port.direction) continue;
       const located = byKey.get(key({ nodeId: other.id, portId: p.id }));
       if (usable(located)) candidates.push(located);
     }
@@ -149,7 +149,7 @@ export function planBulkConnect(doc: DiagramDocument, pageId: string, selected: 
       plan.skipped.push({ ref: src.ref, reason: 'no-target' });
       continue;
     }
-    const issues = connectionIssues(src.port, target.port);
+    const issues = connectionIssues(src.port, target.port, doc.signalTypes);
     if (issues.includes('signal-mismatch')) {
       plan.skipped.push({ ref: src.ref, reason: 'signal-mismatch' });
       continue;

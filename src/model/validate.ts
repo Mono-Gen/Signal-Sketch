@@ -123,6 +123,7 @@ function checkFields(doc: Record<string, unknown>): string[] {
     str(w, 'id', s.id);
     str(w, 'label', s.label);
     str(w, 'color', s.color);
+    str(w, 'parent', s.parent, true);
     if (s.lineStyle !== undefined) oneOf(w, 'lineStyle', s.lineStyle, LINE_STYLES);
   });
   (doc.deviceTemplates as Record<string, unknown>[]).forEach((t, i) => {
@@ -263,6 +264,11 @@ export function validateDocument(input: unknown): ValidationResult {
     if (signalIds.has(s.id)) errors.push(`信号種別IDが重複しています: ${s.id}`);
     signalIds.add(s.id);
     if (!isHexColor(s.color)) errors.push(`信号種別 ${s.id} の色が #RRGGBB 形式ではありません: ${String(s.color)}`);
+  }
+  for (const s of doc.signalTypes) {
+    if (s.parent === undefined) continue;
+    const parent = doc.signalTypes.find((p) => p.id === s.parent);
+    if (!parent || parent.id === s.id || parent.parent !== undefined) errors.push(`信号種別 ${s.id} の親が不正です: ${s.parent}`);
   }
   const templates = new Map<string, DeviceTemplate>();
   for (const t of doc.deviceTemplates) {

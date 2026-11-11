@@ -1,4 +1,5 @@
 import { locatePorts } from './bulkConnect';
+import { rootSignalId } from './diagnostics';
 import type { DiagramDocument, PortRef } from './types';
 
 /**
@@ -23,6 +24,6 @@ export function connectCandidates(doc: DiagramDocument, pageId: string, from: Po
   if (!isFree(start)) return [];
 
   return all
-    .filter((p) => p !== start && p.port.signalType === start.port.signalType && isFree(p))
+    .filter((p) => p !== start && rootSignalId(doc.signalTypes, p.port.signalType) === rootSignalId(doc.signalTypes, start.port.signalType) && isFree(p))
     .map((p) => p.ref);
 }

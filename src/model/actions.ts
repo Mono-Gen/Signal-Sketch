@@ -141,7 +141,7 @@ export function addEdge(pageId: string, from: PortRef, to: PortRef): Action {
       from: { ...from },
       to: { ...to },
     });
-    const warnings: ActionWarning[] = connectionIssues(pa, pb);
+    const warnings: ActionWarning[] = connectionIssues(pa, pb, doc.signalTypes);
     return warnings.length === 0 ? OK : { ok: true, warning: warnings[0], warnings };
   };
 }

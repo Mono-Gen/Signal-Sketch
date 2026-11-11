@@ -72,6 +72,7 @@ export function copySelection(
   const usedSignals = new Set<string>();
   for (const t of templates) for (const g of t.portGroups) usedSignals.add(g.signalType);
   for (const n of nodes) for (const g of n.portGroupsOverride ?? []) usedSignals.add(g.signalType);
+  for (const s of doc.signalTypes) if (usedSignals.has(s.id) && s.parent) usedSignals.add(s.parent);
   const signalTypes = doc.signalTypes.filter((s) => usedSignals.has(s.id));
 
   const assetIds = new Set<string>();
@@ -184,7 +185,7 @@ export function suggestPasteOffset(doc: DiagramDocument, pageId: string, data: C
 /**
  * コピーした内容を貼り付ける。IDは振り直し、位置は offset だけずらす(グリッドへ吸着し、ページの外へ出ないよう収める)。
  * 貼り付けた機器・枠のIDは、結果の createdNodeIds / createdFrameIds に入る。
- * 図に無い機器の種類・信号の種類は、同じIDのものが無い場合に限り補う(既存の定義は上書きしない)。
+ * 同じIDの定義が異なる場合はIDを振り直し、貼り付け先の既存定義を保つ。
  */
 export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx: number; dy: number }): Action {
   return (doc): ActionResult => {
@@ -212,10 +213,39 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     const nextAssets = { ...doc.assets, ...data.assets };
     if (assetsIssue(nextAssets)) return { ok: false, error: 'document-too-large' };
 
+    const signalIdMap = new Map<string, string>();
+    const importedSignals: SignalType[] = [];
+    const reservedIds = new Set([...doc.signalTypes.map((s) => s.id), ...data.signalTypes.map((s) => s.id)]);
+    const incomingById = new Map(data.signalTypes.map((s) => [s.id, s]));
+    if (incomingById.size !== data.signalTypes.length) return { ok: false, error: 'invalid-value' };
+    const incoming = [...data.signalTypes.filter((s) => s.parent === undefined), ...data.signalTypes.filter((s) => s.parent !== undefined)];
+    for (const signal of incoming) {
+      let parent: string | undefined;
+      if (signal.parent !== undefined) {
+        const incomingParent = incomingById.get(signal.parent);
+        if (!incomingParent || incomingParent.parent !== undefined || incomingParent.id === signal.id) return { ok: false, error: 'invalid-value' };
+        parent = signalIdMap.get(signal.parent);
+        if (parent === undefined) return { ok: false, error: 'invalid-value' };
+      }
+      const existing = doc.signalTypes.find((s) => s.id === signal.id);
+      if (existing && existing.label === signal.label && existing.parent === parent) {
+        signalIdMap.set(signal.id, existing.id);
+        continue;
+      }
+      const id = existing ? uniqueId(signal.id, reservedIds) : signal.id;
+      reservedIds.add(id);
+      signalIdMap.set(signal.id, id);
+      importedSignals.push({ ...structuredClone(signal), id, ...(parent !== undefined ? { parent } : {}) });
+    }
+    const remapSignal = (id: string): string => signalIdMap.get(id) ?? id;
+    const incomingTemplates = structuredClone(data.templates);
+    for (const template of incomingTemplates) for (const group of template.portGroups) group.signalType = remapSignal(group.signalType);
+    const incomingNodes = structuredClone(data.nodes);
+    for (const node of incomingNodes) for (const group of node.portGroupsOverride ?? []) group.signalType = remapSignal(group.signalType);
     const templateIdMap = new Map<string, string>();
     const importedTemplates: DeviceTemplate[] = [];
     const resolvedTemplates = [...doc.deviceTemplates];
-    for (const template of data.templates) {
+    for (const template of incomingTemplates) {
       const existing = resolvedTemplates.find((candidate) => candidate.id === template.id);
       if (!existing) {
         const imported = structuredClone(template);
@@ -257,15 +287,13 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     const dx = s(clamp(offset.dx, -minX, page.size.w - maxX));
     const dy = s(clamp(offset.dy, -minY, page.size.h - maxY));
 
-    for (const st of data.signalTypes) {
-      if (!doc.signalTypes.some((x) => x.id === st.id)) doc.signalTypes.push(structuredClone(st));
-    }
+    doc.signalTypes.push(...importedSignals);
     doc.deviceTemplates.push(...importedTemplates);
     doc.assets = nextAssets;
 
     const nodeIdMap = new Map<string, string>();
     const createdNodeIds: string[] = [];
-    for (const n of structuredClone(data.nodes)) {
+    for (const n of incomingNodes) {
       const id = uniqueId('n', page.nodes.map((x) => x.id));
       nodeIdMap.set(n.id, id);
       page.nodes.push({

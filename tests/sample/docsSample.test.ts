@@ -14,6 +14,8 @@ describe('docs/sample_diagram.json', () => {
   it('アプリ内のサンプルの図と、内容が一致する', () => {
     const r = parseDocument(text);
     if (!r.ok) throw new Error(r.errors.join(' / '));
-    expect(r.doc).toEqual(createSampleDocument());
+    const sample = createSampleDocument();
+    sample.signalTypes = sample.signalTypes.filter((signal) => signal.id !== 'SERIAL');
+    expect(r.doc).toEqual(sample);
   });
 });

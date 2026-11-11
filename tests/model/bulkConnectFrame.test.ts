@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addEdge, addNodeFromTemplate } from '../../src/model/actions';
 import { planBulkConnect } from '../../src/model/bulkConnect';
 import { createEmptyDocument } from '../../src/model/defaults';
+import { addSignalType } from '../../src/model/signalActions';
 import { addFrame, resizeFrame, followersInFrame, sortReadingOrder } from '../../src/model/frames';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
 
@@ -171,4 +172,20 @@ describe('sortReadingOrder: 非推移の連鎖', () => {
     const order = sortReadingOrder([node(doc, c), node(doc, b), node(doc, a)]).map((n) => n.id);
     expect(order).toEqual([a, b, c]);
   });
+});
+
+it('continues to a sibling signal in the same group on the next device', () => {
+  const doc = createEmptyDocument();
+  frame(doc, 0, 0, 1200, 900);
+  const amp = place(doc, 'amp', 'AMP', 40, 40);
+  const first = place(doc, 'speaker', 'S1', 700, 100);
+  const second = place(doc, 'speaker', 'S2', 700, 300);
+  const a = addSignalType('a', '#123456', 'AUDIO')(doc).created!;
+  const b = addSignalType('b', '#123456', 'AUDIO')(doc).created!;
+  const group = (signalType: string) => [{ id: 'audio', signalType, direction: 'in' as const, side: 'left' as const, count: 1, labelPrefix: 'IN' }];
+  node(doc, first).portGroupsOverride = group(a);
+  node(doc, second).portGroupsOverride = group(b);
+  const plan = planBulkConnect(doc, P, [ref(amp, 'audio-out-1'), ref(amp, 'audio-out-2')], ref(first, 'audio-1'));
+  expect(plan.skipped).toEqual([]);
+  expect(plan.pairs.map((pair) => pair.to.nodeId)).toEqual([first, second]);
 });

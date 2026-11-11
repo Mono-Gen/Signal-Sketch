@@ -8,6 +8,7 @@ export const DEFAULT_SIGNAL_TYPES: readonly SignalType[] = [
   { id: 'HDMI', label: 'HDMI', color: '#6f8fd0' },
   { id: 'USB', label: 'USB', color: '#7b4fa0' },
   { id: 'AUDIO', label: 'AUDIO', color: '#ff6fa8' },
+  { id: 'SERIAL', label: 'SERIAL', color: '#d9480f', lineStyle: 'dashed' },
 ];
 
 /** ページの基準サイズ(16:9。設計書 D4) */

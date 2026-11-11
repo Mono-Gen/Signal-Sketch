@@ -3,7 +3,7 @@ import { uniqueId } from './ids';
 import { isLineStyle } from './lineStyle';
 import type { LineStyle } from './lineStyle';
 import { getNodePorts } from './query';
-import type { DiagramDocument } from './types';
+import type { DiagramDocument, SignalType } from './types';
 
 const OK: ActionResult = { ok: true };
 const fail = (error: NonNullable<ActionResult['error']>): ActionResult => ({ ok: false, error });
@@ -27,15 +27,19 @@ export function signalUsage(doc: DiagramDocument, signalId: string): number {
  * 後者を数えるのは、そのテンプレートから機器を追加したとき、種別が無くなって線の色を失わないため。
  */
 function isSignalInUse(doc: DiagramDocument, signalId: string): boolean {
-  return signalUsage(doc, signalId) > 0 || doc.deviceTemplates.some((t) => t.portGroups.some((g) => g.signalType === signalId));
+  return doc.pages.some((p) => p.nodes.some((n) => n.portGroupsOverride?.some((g) => g.signalType === signalId))) || signalUsage(doc, signalId) > 0 || doc.deviceTemplates.some((t) => t.portGroups.some((g) => g.signalType === signalId));
 }
 
 /** 信号種別を追加する。IDは自動採番(名称を変えても参照が切れないよう、IDと表示名は別) */
-export function addSignalType(label: string, color: string): Action {
+export function addSignalType(label: string, color: string, parentId?: string): Action {
   return (doc) => {
     if (label.trim() === '' || !isHexColor(color)) return fail('invalid-value');
+    const parent = parentId === undefined ? undefined : doc.signalTypes.find((s) => s.id === parentId);
+    if (parentId !== undefined && (!parent || parent.parent !== undefined)) return fail('invalid-value');
     const id = uniqueId('SIG', doc.signalTypes.map((s) => s.id));
-    doc.signalTypes.push({ id, label: label.trim(), color });
+    const shade = parent ? availableChildShade(doc.signalTypes, parent.id) : color;
+    if (shade === undefined) return fail('invalid-value');
+    doc.signalTypes.push({ id, label: label.trim(), color: shade, ...(parent ? { parent: parent.id } : {}) });
     return { ok: true, created: id };
   };
 }
@@ -60,7 +64,7 @@ export function updateSignalType(id: string, patch: { label?: string; color?: st
 export function removeSignalType(id: string): Action {
   return (doc) => {
     if (!doc.signalTypes.some((x) => x.id === id)) return fail('unknown-signal');
-    if (isSignalInUse(doc, id)) return fail('signal-in-use');
+    if (isSignalInUse(doc, id) || doc.signalTypes.some((s) => s.parent === id)) return fail('signal-in-use');
     doc.signalTypes = doc.signalTypes.filter((x) => x.id !== id);
     return OK;
   };
@@ -71,9 +75,84 @@ export function moveSignalType(id: string, delta: -1 | 1): Action {
   return (doc) => {
     const i = doc.signalTypes.findIndex((x) => x.id === id);
     if (i < 0) return fail('unknown-signal');
-    const j = i + delta;
-    if (j < 0 || j >= doc.signalTypes.length) return OK;
+    const peers = doc.signalTypes.filter((s) => s.parent === doc.signalTypes[i].parent);
+    const peerIndex = peers.findIndex((s) => s.id === id);
+    const neighbor = peers[peerIndex + delta];
+    if (!neighbor) return OK;
+    const j = doc.signalTypes.indexOf(neighbor);
     [doc.signalTypes[i], doc.signalTypes[j]] = [doc.signalTypes[j], doc.signalTypes[i]];
+    return OK;
+  };
+}
+
+export function signalUsageDetails(doc: DiagramDocument, signalId: string): { ports: number; devices: { name: string; count: number }[]; templates: string[] } {
+  const counts = new Map<string, number>();
+  for (const page of doc.pages) for (const node of page.nodes) {
+    const count = getNodePorts(doc, node).filter((p) => p.signalType === signalId).length;
+    if (count || node.portGroupsOverride?.some((g) => g.signalType === signalId)) counts.set(node.label, (counts.get(node.label) ?? 0) + count);
+  }
+  return { ports: [...counts.values()].reduce((a, b) => a + b, 0), devices: [...counts].map(([name, count]) => ({ name, count })), templates: doc.deviceTemplates.filter((t) => t.portGroups.some((g) => g.signalType === signalId)).map((t) => t.name) };
+}
+
+export function reassignAndRemoveSignalType(id: string, toId: string): Action {
+  return (doc) => {
+    const source = doc.signalTypes.find((s) => s.id === id);
+    const target = doc.signalTypes.find((s) => s.id === toId);
+    if (!source || !target || id === toId) return fail('unknown-signal');
+    if (target.parent === id) return fail('invalid-value');
+    if (doc.signalTypes.some((s) => s.parent === id)) return fail('signal-in-use');
+    for (const t of doc.deviceTemplates) for (const g of t.portGroups) if (g.signalType === id) g.signalType = toId;
+    for (const p of doc.pages) for (const n of p.nodes) for (const g of n.portGroupsOverride ?? []) if (g.signalType === id) g.signalType = toId;
+    doc.signalTypes = doc.signalTypes.filter((s) => s.id !== id);
+    return OK;
+  };
+}
+
+export function setSignalParent(id: string, parentId: string | null): Action {
+  return (doc) => {
+    const signal = doc.signalTypes.find((s) => s.id === id);
+    if (!signal) return fail('unknown-signal');
+    if (parentId === null) { delete signal.parent; return OK; }
+    const parent = doc.signalTypes.find((s) => s.id === parentId);
+    if (!parent || parent.id === id || parent.parent !== undefined || doc.signalTypes.some((s) => s.parent === id)) return fail('invalid-value');
+    signal.parent = parentId;
+    return OK;
+  };
+}
+
+export function childShade(color: string, index: number): string {
+  const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255);
+  const max = Math.max(...rgb), min = Math.min(...rgb), light = (max + min) / 2;
+  const sat = max === min ? 0 : (max - min) / (1 - Math.abs(2 * light - 1));
+  const newLight = 0.3 + ((index * 37) % 101) / 250;
+  const chroma = (1 - Math.abs(2 * newLight - 1)) * sat;
+  const oldChroma = max - min;
+  const values = oldChroma === 0 ? rgb.map(() => newLight) : rgb.map((v) => ((v - min) / oldChroma) * chroma + newLight - chroma / 2);
+  return '#' + values.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+}
+
+export function orderedSignalTypes(signals: readonly SignalType[]): SignalType[] {
+  return signals.filter((s) => s.parent === undefined).flatMap((root) => [root, ...signals.filter((s) => s.parent === root.id)]);
+}
+
+export function availableChildShade(signals: readonly SignalType[], parentId: string, excludeId?: string): string | undefined {
+  const parent = signals.find((s) => s.id === parentId);
+  if (!parent || parent.parent !== undefined) return undefined;
+  const used = new Set(signals.filter((s) => s.parent === parentId && s.id !== excludeId).map((s) => s.color.toLowerCase()));
+  for (let i = 0; i < 101; i++) {
+    const shade = childShade(parent.color, i);
+    if (!used.has(shade)) return shade;
+  }
+  return undefined;
+}
+
+export function recreateSignalColor(id: string): Action {
+  return (doc) => {
+    const signal = doc.signalTypes.find((s) => s.id === id);
+    if (!signal) return fail('unknown-signal');
+    const color = signal.parent && availableChildShade(doc.signalTypes, signal.parent, id);
+    if (!color) return fail('invalid-value');
+    signal.color = color;
     return OK;
   };
 }

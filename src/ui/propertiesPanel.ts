@@ -10,7 +10,7 @@ import { uniqueId } from '../model/ids';
 import { PAGE_SIZE_PRESETS, presetIndexOf } from '../model/pageSize';
 import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
-import { addSignalType, moveSignalType, removeSignalType, signalUsage, updateSignalType } from '../model/signalActions';
+import { addSignalType, isHexColor, moveSignalType, orderedSignalTypes, reassignAndRemoveSignalType, recreateSignalColor, removeSignalType, setSignalParent, signalUsageDetails, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
@@ -410,51 +410,70 @@ export class PropertiesPanel {
 
   private legendSection(doc: DiagramDocument): HTMLElement {
     const section = el('div', { className: 'section' }, [el('h3', { text: t('legend.edit') })]);
-    const last = doc.signalTypes.length - 1;
-    doc.signalTypes.forEach((s, i) => {
-      const used = signalUsage(doc, s.id);
+    const roots = doc.signalTypes.filter((s) => !s.parent);
+    const ordered = orderedSignalTypes(doc.signalTypes);
+    for (const s of ordered) {
+      const peers = ordered.filter((x) => x.parent === s.parent);
+      const i = peers.indexOf(s);
+      const usage = signalUsageDetails(doc, s.id);
+      const children = doc.signalTypes.filter((x) => x.parent === s.id);
+      const row = el('div', { className: 'signal-row', attrs: { 'data-signal': s.id, ...(s.parent ? { style: 'margin-left: 20px' } : {}) } });
       const color = el('input', {
         className: 'color-input',
         attrs: { type: 'color', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color' },
         on: { change: (ev) => this.ctx.apply(updateSignalType(s.id, { color: (ev.target as HTMLInputElement).value })) },
       });
-      const label = el('input', {
-        attrs: { type: 'text', value: s.label, 'data-prop': 'signal-label' },
-        on: {
-          change: (ev) => {
-            const r = this.ctx.apply(updateSignalType(s.id, { label: (ev.target as HTMLInputElement).value }));
-            if (!r.ok) this.update(null); // 空の名称などは拒否し、入力欄を元の値へ戻す
-          },
-        },
+      const colorText = el('input', {
+        attrs: { type: 'text', value: s.color, 'aria-label': t('legend.colorLabel'), 'data-prop': 'signal-color-text' },
+        on: { change: (ev) => {
+          const input = ev.target as HTMLInputElement;
+          if (!isHexColor(input.value)) { input.value = s.color; this.ctx.setStatus('error', t('legend.badColor')); return; }
+          if (!this.ctx.apply(updateSignalType(s.id, { color: input.value })).ok) input.value = s.color;
+        } },
       });
-      const lineSelect = select(
-        LINE_STYLES.map((v) => ({ value: v, label: t(`legend.line.${v}` as MessageKey) })),
-        lineStyleOf(s),
-      );
-      lineSelect.setAttribute('aria-label', t('legend.lineLabel'));
-      lineSelect.setAttribute('data-prop', 'signal-line');
-      lineSelect.addEventListener('change', () => this.ctx.apply(updateSignalType(s.id, { lineStyle: lineSelect.value as LineStyle })));
-      const button = (text: string, aria: string, action: string, disabled: boolean, onClick: () => void) =>
-        el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click: onClick } });
-      const row = el('div', { className: 'signal-row', attrs: { 'data-signal': s.id } }, [
-        color,
-        label,
-        lineSelect,
-        button(t('legend.up'), t('legend.upLabel'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1))),
-        button(t('legend.down'), t('legend.downLabel'), 'signal-down', i === last, () => this.ctx.apply(moveSignalType(s.id, 1))),
-        button(t('legend.remove'), t('legend.remove'), 'signal-remove', false, () => this.ctx.apply(removeSignalType(s.id))),
-      ]);
-      if (used > 0) row.title = t('legend.usage', { count: used });
+      const label = el('input', { attrs: { type: 'text', value: s.label, 'data-prop': 'signal-label' }, on: { change: (ev) => {
+        if (!this.ctx.apply(updateSignalType(s.id, { label: (ev.target as HTMLInputElement).value })).ok) this.update(null);
+      } } });
+      const line = select(LINE_STYLES.map((v) => ({ value: v, label: t(`legend.line.${v}` as MessageKey) })), lineStyleOf(s));
+      line.setAttribute('aria-label', t('legend.lineLabel'));
+      line.setAttribute('data-prop', 'signal-line');
+      line.addEventListener('change', () => this.ctx.apply(updateSignalType(s.id, { lineStyle: line.value as LineStyle })));
+      const parent = select([{ value: '', label: t('legend.noParent') }, ...roots.filter((r) => r.id !== s.id).map((r) => ({ value: r.id, label: r.label }))], s.parent ?? '');
+      parent.setAttribute('aria-label', t('legend.parent'));
+      parent.setAttribute('data-prop', 'signal-parent');
+      if (children.length) parent.disabled = true;
+      parent.addEventListener('change', () => { if (!this.ctx.apply(setSignalParent(s.id, parent.value || null)).ok) this.update(null); });
+      const button = (text: string, action: string, disabled: boolean, click: () => void, aria = text) =>
+        el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click } });
+      row.append(color, colorText, label, line, parent,
+        button(t('legend.up'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1)), t('legend.upLabel')),
+        button(t('legend.down'), 'signal-down', i === peers.length - 1, () => this.ctx.apply(moveSignalType(s.id, 1)), t('legend.downLabel')));
+      if (s.parent) row.append(button(t('legend.recreate'), 'signal-recreate', false, () => {
+        this.ctx.apply(recreateSignalColor(s.id));
+      }));
+      else row.append(button(t('legend.addChild'), 'signal-add-child', false, () => this.ctx.apply(addSignalType(t('legend.newLabel'), s.color, s.id))));
+      row.append(button(t('legend.remove'), 'signal-remove', false, () => {
+        if (children.length) { this.ctx.setStatus('error', t('legend.children')); return; }
+        if (!usage.devices.length && !usage.templates.length) { this.ctx.apply(removeSignalType(s.id)); return; }
+        const confirmation = el('div', { attrs: { role: 'group', 'aria-label': t('legend.reassign') } });
+        const names = (values: string[]) => values.slice(0, 3).join(', ') + (values.length > 3 ? ', ' + t('legend.more', { count: values.length - 3 }) : '');
+        if (usage.devices.length) confirmation.append(el('p', { text: t('legend.usedDevices', { names: names(usage.devices.map((d) => `${d.name} (${d.count})`)) }) }));
+        if (usage.templates.length) confirmation.append(el('p', { text: t('legend.usedTemplates', { names: names(usage.templates) }) }));
+        const targets = doc.signalTypes.filter((x) => x.id !== s.id && x.parent !== s.id);
+        if (targets.length) {
+          const target = select(targets.map((x) => ({ value: x.id, label: x.label })), targets[0].id);
+          target.setAttribute('aria-label', t('legend.reassign'));
+          confirmation.append(target, button(t('legend.reassign'), 'signal-confirm-remove', false, () => this.ctx.apply(reassignAndRemoveSignalType(s.id, target.value))));
+        } else confirmation.append(el('p', { text: t('legend.noTarget') }));
+        confirmation.append(button(t('legend.cancel'), 'signal-cancel-remove', false, () => confirmation.remove()));
+        row.after(confirmation);
+      }));
       section.append(row);
-    });
-    section.append(el('p', { className: 'hint', text: t('legend.lineHint') }));
-    section.append(
-      el('button', {
-        text: t('legend.add'),
-        attrs: { type: 'button', 'data-action': 'signal-add' },
-        on: { click: () => this.ctx.apply(addSignalType(t('legend.newLabel'), NEW_SIGNAL_COLORS[doc.signalTypes.length % NEW_SIGNAL_COLORS.length])) },
-      }),
-    );
+    }
+    section.append(el('p', { className: 'hint', text: t('legend.lineHint') }), el('button', {
+      text: t('legend.add'), attrs: { type: 'button', 'data-action': 'signal-add' },
+      on: { click: () => this.ctx.apply(addSignalType(t('legend.newLabel'), NEW_SIGNAL_COLORS[doc.signalTypes.length % NEW_SIGNAL_COLORS.length])) },
+    }));
     return section;
   }
 

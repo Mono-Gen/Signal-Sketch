@@ -5,6 +5,7 @@ import { markerSpec } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
+import { orderedSignalTypes } from '../model/signalActions';
 import type { DiagramDocument, DiagramNode, DiagramNote, SignalType } from '../model/types';
 import { escapeHtml } from '../util/escapeHtml';
 import { iconSvgGroup } from '../view/icons';
@@ -206,10 +207,20 @@ function dashAttr(s: SignalType | undefined): string {
 function legendSvg(doc: DiagramDocument, y: number, opts: SvgExportOptions, th: Theme): string {
   const items: string[] = [`<text x="12" y="${num(y + 24)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(opts.legendTitle)}</text>`];
   let x = 12 + 8 * (opts.legendTitle.length + 2);
-  for (const s of doc.signalTypes) {
-    items.push(`<line x1="${num(x)}" y1="${num(y + 20)}" x2="${num(x + 28)}" y2="${num(y + 20)}" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round"${dashAttr(s)}/>`);
-    items.push(`<text x="${num(x + 36)}" y="${num(y + 24)}" font-size="12" fill="${th.modelText}">${esc(s.label)}</text>`);
-    x += 36 + 8 * s.label.length + 24;
+  const ordered = orderedSignalTypes(doc.signalTypes);
+  for (const root of ordered.filter((s) => !s.parent)) {
+    const children = ordered.filter((s) => s.parent === root.id);
+    const draw = (s: SignalType, atX: number, atY: number) => {
+      items.push(`<line x1="${num(atX)}" y1="${num(atY)}" x2="${num(atX + 28)}" y2="${num(atY)}" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round"${dashAttr(s)}/>`);
+      items.push(`<text x="${num(atX + 36)}" y="${num(atY + 4)}" font-size="12" fill="${th.modelText}">${esc(s.label)}</text>`);
+    };
+    draw(root, x, children.length ? y + 10 : y + 20);
+    let childX = x + 12;
+    for (const child of children) {
+      draw(child, childX, y + 30);
+      childX += 36 + 8 * child.label.length + 24;
+    }
+    x = Math.max(x + 36 + 8 * root.label.length + 24, childX);
   }
   return `<g>${items.join('')}</g>`;
 }

@@ -19,6 +19,7 @@ export type Language = 'ja' | 'en';
 export interface SignalType {
   id: string;
   label: string;
+  parent?: string;
   /** 線の色(CSSの色指定) */
   color: string;
   /** 線の種類。なければ実線 */

@@ -651,7 +651,7 @@ export class DiagramView {
             ...dashStyle(signals.get(fromPort?.signalType ?? '')),
             // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
             // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
-            ...this.issueStyle(fromPort, toPort),
+            ...this.issueStyle(fromPort, toPort, doc.signalTypes),
             sourcePortConstraint: fromSide ? SIDE_TO_CONSTRAINT[fromSide] : undefined,
             targetPortConstraint: toSide ? SIDE_TO_CONSTRAINT[toSide] : undefined,
           },
@@ -673,9 +673,9 @@ export class DiagramView {
     });
   }
 
-  private issueStyle(a: Port | undefined, b: Port | undefined): { dashed?: boolean; dashPattern?: string } {
+  private issueStyle(a: Port | undefined, b: Port | undefined, signals: readonly SignalType[]): { dashed?: boolean; dashPattern?: string } {
     if (!a || !b) return {};
-    const issues = connectionIssues(a, b);
+    const issues = connectionIssues(a, b, signals);
     if (issues.includes('direction-mismatch')) return { dashed: true, dashPattern: '8 4' };
     if (issues.includes('signal-mismatch')) return { dashed: true, dashPattern: '2 4' };
     return {};
