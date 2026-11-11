@@ -79,6 +79,45 @@ describe('貼り付けの境界(iconRef・ずらし量)', () => {
 });
 
 describe('copySelection', () => {
+  it('欠番のある同一IDテンプレートへ通常の機器と接続を貼ると定義を分離する', () => {
+    const source = fresh();
+    const data = copySelection(source, P, { nodeIds: ['mute', 'sw'] })!;
+    const dest = fresh();
+    dest.deviceTemplates.find((t) => t.id === 'switch')!.portGroups[0].skipped = [1];
+    dest.pages[0].edges = dest.pages[0].edges.filter((e) => e.id !== 'e-5');
+    const result = paste(dest, data);
+    expect(result.ok).toBe(true);
+    const pasted = dest.pages[0].nodes.find((n) => result.createdNodeIds!.includes(n.id) && n.label === 'Network Switch')!;
+    expect(pasted.templateId).not.toBe('switch');
+    expect(dest.deviceTemplates.find((t) => t.id === pasted.templateId)!.portGroups[0].skipped).toBeUndefined();
+    const reloaded = parseDocument(serializeDocument(dest));
+    expect(reloaded.ok).toBe(true);
+    expect(dest.pages[0].edges.some((e) => e.to.nodeId === pasted.id && e.to.portId === 'lan-l-1')).toBe(true);
+  });
+
+  it('欠番と開始番号を持つテンプレートを通常の同一IDと区別して貼り付ける', () => {
+    const source = fresh();
+    const group = source.deviceTemplates.find((t) => t.id === 'switch')!.portGroups[0];
+    group.skipped = [1];
+    group.startNumber = 0;
+    source.pages[0].edges = source.pages[0].edges.filter((e) => e.id !== 'e-5');
+    const dest = fresh();
+    const result = paste(dest, copySelection(source, P, { nodeIds: ['sw', 'tsc'] })!);
+    expect(result.ok).toBe(true);
+    const pasted = dest.pages[0].nodes.find((n) => result.createdNodeIds!.includes(n.id) && n.label === 'Network Switch')!;
+    expect(pasted.templateId).not.toBe('switch');
+    expect(dest.deviceTemplates.find((t) => t.id === pasted.templateId)!.portGroups[0]).toMatchObject({ skipped: [1], startNumber: 0 });
+    expect(parseDocument(serializeDocument(dest)).ok).toBe(true);
+  });
+
+  it('欠番なしと空配列、開始番号の省略と1は同じ定義として再利用する', () => {
+    const source = fresh();
+    Object.assign(source.deviceTemplates.find((t) => t.id === 'switch')!.portGroups[0], { skipped: [], startNumber: 1 });
+    const dest = fresh();
+    const result = paste(dest, copySelection(source, P, { nodeIds: ['sw'] })!);
+    const pasted = dest.pages[0].nodes.find((n) => n.id === result.createdNodeIds![0])!;
+    expect(pasted.templateId).toBe('switch');
+  });
   it('何も選ばれていない・存在しないページは null', () => {
     const doc = fresh();
     expect(copySelection(doc, P, {})).toBeNull();

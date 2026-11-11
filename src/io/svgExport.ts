@@ -9,7 +9,7 @@ import { orderedSignalTypes } from '../model/signalActions';
 import type { DiagramDocument, DiagramNode, DiagramNote, SignalType } from '../model/types';
 import { escapeHtml } from '../util/escapeHtml';
 import { iconSvgGroup } from '../view/icons';
-import { FLAT_THEME } from '../view/theme';
+import { FLAT_THEME, signalColor } from '../view/theme';
 import type { Theme } from '../view/theme';
 
 // 図をSVGにする。画面の描画(maxGraph)をコピーせず、モデルから描き直す:
@@ -154,9 +154,9 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
   for (const pl of layoutNodePorts(doc, n)) {
     const port = ports.find((p) => p.id === pl.portId);
     if (!port) continue;
-    const color = signals.get(port.signalType)?.color ?? '#888888';
+    const color = signalColor(th, signals.get(port.signalType)?.color ?? '#888888');
     const spec = markerSpec(port.direction, pl.side);
-    const fill = connected.has(`${n.id}/${port.id}`) ? color : '#ffffff';
+    const fill = connected.has(`${n.id}/${port.id}`) ? color : th.portEmptyFill;
     parts.push(
       `<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize)}" fill="${fill}" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>`,
     );
@@ -211,7 +211,7 @@ function legendSvg(doc: DiagramDocument, y: number, opts: SvgExportOptions, th: 
   for (const root of ordered.filter((s) => !s.parent)) {
     const children = ordered.filter((s) => s.parent === root.id);
     const draw = (s: SignalType, atX: number, atY: number) => {
-      items.push(`<line x1="${num(atX)}" y1="${num(atY)}" x2="${num(atX + 28)}" y2="${num(atY)}" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round"${dashAttr(s)}/>`);
+      items.push(`<line x1="${num(atX)}" y1="${num(atY)}" x2="${num(atX + 28)}" y2="${num(atY)}" stroke="${esc(signalColor(th, s.color))}" stroke-width="3" stroke-linecap="round"${dashAttr(s)}/>`);
       items.push(`<text x="${num(atX + 36)}" y="${num(atY + 4)}" font-size="12" fill="${th.modelText}">${esc(s.label)}</text>`);
     };
     draw(root, x, children.length ? y + 10 : y + 20);
@@ -256,7 +256,7 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
     if (!pts || pts.length < 2) continue;
     const fromNode = page.nodes.find((n) => n.id === e.from.nodeId);
     const fromPort = fromNode ? getNodePorts(doc, fromNode).find((p) => p.id === e.from.portId) : undefined;
-    const color = signals.get(fromPort?.signalType ?? '')?.color ?? '#666666';
+    const color = signalColor(th, signals.get(fromPort?.signalType ?? '')?.color ?? '#666666');
     edges.push(`<path d="${roundedPath(pts, CORNER_RADIUS)}" fill="none" stroke="${esc(color)}" stroke-width="${th.edgeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr(signals.get(fromPort?.signalType ?? ''))}/>`);
   }
 
@@ -266,7 +266,7 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family='${FONT}'>`,
-    `<rect width="${w}" height="${h}" fill="#ffffff"/>`,
+    `<rect width="${w}" height="${h}" fill="${th.signalPaper ?? '#ffffff'}"/>`,
     ...frames,
     ...notes,
     ...edges,
@@ -278,7 +278,7 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
 }
 
 /** SVG文書をPNGにする(ブラウザの描画を使う)。scale は解像度の倍率 */
-export async function svgToPng(svg: string, width: number, height: number, scale = 2): Promise<Blob> {
+export async function svgToPng(svg: string, width: number, height: number, scale = 2, background = '#ffffff'): Promise<Blob> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
     const img = new Image();
@@ -294,7 +294,7 @@ export async function svgToPng(svg: string, width: number, height: number, scale
     canvas.height = Math.round(height * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('canvas を使えません');
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNGへ変換できませんでした'))), 'image/png'));

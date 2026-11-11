@@ -10,6 +10,7 @@ import { uniqueId } from '../model/ids';
 import { PAGE_SIZE_PRESETS, presetIndexOf } from '../model/pageSize';
 import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
+import { restorePorts } from '../model/portActions';
 import { addSignalType, isHexColor, moveSignalType, orderedSignalTypes, reassignAndRemoveSignalType, recreateSignalColor, removeSignalType, setSignalParent, signalUsageDetails, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
@@ -656,6 +657,14 @@ export class PropertiesPanel {
     const section = el('div', { className: 'section' }, [el('h3', { text: t('props.ports') })]);
 
     const commit = (next: PortGroup[]) => {
+      next = next.map((group) => {
+        const copy = { ...group };
+        if (copy.skipped) {
+          copy.skipped = copy.skipped.filter((n) => n <= copy.count);
+          if (!copy.skipped.length) delete copy.skipped;
+        }
+        return copy;
+      });
       const lost = ids.flatMap((id) => lostEdgeIds(this.ctx.getDoc(), this.ctx.pageId, id, next));
       if (lost.length > 0 && !this.ctx.confirm(t('confirm.removePorts', { count: lost.length }))) {
         back(); // 取り消し: 入力欄を元の値へ戻す
@@ -683,6 +692,7 @@ export class PropertiesPanel {
           t('props.prefix'),
           el('input', { attrs: { type: 'text', value: g.labelPrefix, 'data-prop': 'port-prefix' }, on: { change: (ev) => edit({ labelPrefix: (ev.target as HTMLInputElement).value }) } }),
         ),
+        field(t('props.startNumber'), el('input', { attrs: { type: 'number', min: '0', max: '9999', step: '1', value: String(g.startNumber ?? 1), 'data-prop': 'port-start' }, on: { change: (ev) => edit({ startNumber: Number((ev.target as HTMLInputElement).value) }) } })),
         el('button', {
           className: 'danger',
           text: t('props.removeGroup'),
@@ -690,6 +700,9 @@ export class PropertiesPanel {
           on: { click: () => commit(groups.filter((_, j) => j !== i)) },
         }),
       ]);
+      if (!many) for (const index of g.skipped ?? []) {
+        row.append(el('button', { text: t('props.restorePort', { number: (g.startNumber ?? 1) + index - 1 }), attrs: { type: 'button', 'data-action': 'restore-port' }, on: { click: () => this.ctx.apply(restorePorts(this.ctx.pageId, node.id, g.id, [index])) } }));
+      }
       section.append(row);
     });
 

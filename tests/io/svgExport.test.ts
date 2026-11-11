@@ -5,6 +5,9 @@ import { setPageSize, updateNode } from '../../src/model/actions';
 import { addFrame } from '../../src/model/frames';
 import { getNodePorts } from '../../src/model/query';
 import { createSampleDocument } from '../fixtures/sampleDocument';
+import { DARK_THEME } from '../../src/view/theme';
+import { FLAT_THEME, signalColor } from '../../src/view/theme';
+import { exportBackground } from '../../src/ui/fileCommands';
 
 const P = 'page-1';
 const opts = (doc: ReturnType<typeof createSampleDocument>) => ({
@@ -34,6 +37,30 @@ describe('roundedPath', () => {
 });
 
 describe('buildSvg', () => {
+  it('暗い信号色を線・ポート・凡例で同じように補正し、空きポートを用紙色にする', () => {
+    const doc = createSampleDocument();
+    doc.signalTypes.find((s) => s.id === 'LAN')!.color = '#141a26';
+    const dark = buildSvg(doc, P, { ...opts(doc), theme: DARK_THEME });
+    const corrected = signalColor(DARK_THEME, '#141a26');
+    expect(corrected).not.toBe('#141a26');
+    expect(dark).toMatch(new RegExp(`<path[^>]*stroke="${corrected}"`));
+    expect(dark).toMatch(new RegExp(`<polygon[^>]*fill="${corrected}" stroke="${corrected}"`));
+    expect(dark).toMatch(new RegExp(`<polygon[^>]*fill="#141a26" stroke="${corrected}"`));
+    expect(dark).toMatch(new RegExp(`<line[^>]*stroke="${corrected}"`));
+    const light = buildSvg(doc, P, { ...opts(doc), theme: FLAT_THEME });
+    expect(light).toBe(buildSvg(doc, P, opts(doc)));
+    expect(light).toMatch(/<path[^>]*stroke="#141a26"/);
+    expect(light).toMatch(/<polygon[^>]*fill="#ffffff" stroke="#141a26"/);
+    expect(light).toMatch(/<line[^>]*stroke="#141a26"/);
+  });
+  it('ダークテーマの背景と文字色を使う', () => {
+    const doc = createSampleDocument();
+    const svg = buildSvg(doc, P, { ...opts(doc), theme: DARK_THEME });
+    expect(svg).toContain('fill="#141a26"');
+    expect(svg).toContain('fill="#e6ebf7"');
+    expect(exportBackground('dark')).toBe('#141a26');
+    expect(exportBackground('light')).toBe('#ffffff');
+  });
   it('ページの大きさを変えると、SVGの寸法もそれに従う(1920x1080 → 幅1920・高さ1120)', () => {
     const doc = createSampleDocument();
     setPageSize(P, { w: 1920, h: 1080 })(doc);

@@ -101,6 +101,9 @@ function samePortGroups(a: DeviceTemplate['portGroups'], b: DeviceTemplate['port
       group.side === other.side &&
       group.count === other.count &&
       group.labelPrefix === other.labelPrefix &&
+      (group.startNumber ?? 1) === (other.startNumber ?? 1) &&
+      (group.skipped ?? []).length === (other.skipped ?? []).length &&
+      (group.skipped ?? []).every((value, i) => value === other.skipped?.[i]) &&
       group.multi === other.multi
     );
   });
@@ -245,6 +248,7 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
     const templateIdMap = new Map<string, string>();
     const importedTemplates: DeviceTemplate[] = [];
     const resolvedTemplates = [...doc.deviceTemplates];
+    const reservedTemplateIds = new Set([...resolvedTemplates.map((t) => t.id), ...incomingTemplates.map((t) => t.id)]);
     for (const template of incomingTemplates) {
       const existing = resolvedTemplates.find((candidate) => candidate.id === template.id);
       if (!existing) {
@@ -261,8 +265,9 @@ export function pasteClipboard(pageId: string, data: ClipboardData, offset: { dx
 
       const id = uniqueId(
         importedTemplatePrefix(template.id),
-        resolvedTemplates.map((candidate) => candidate.id),
+        reservedTemplateIds,
       );
+      reservedTemplateIds.add(id);
       const imported = { ...structuredClone(template), id };
       importedTemplates.push(imported);
       resolvedTemplates.push(imported);

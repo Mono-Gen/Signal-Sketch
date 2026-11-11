@@ -21,7 +21,7 @@ An app for drawing audio, video, control and network system diagrams. Place devi
 
 On first launch, the language follows your browser's preferred (first) language: Japanese if it is Japanese, English otherwise. Switch it with the "English / 日本語" button; your choice is remembered and takes priority from then on. Only the UI text changes; device names and model numbers you typed stay as they are.
 
-The screen colors can be switched with the "Theme" button, which cycles through Auto (follows your OS light/dark setting), Light and Dark. Your choice is remembered, except for Auto, which simply follows the OS. The theme affects only the screen: exported SVG and PNG images always use the light colors. In Dark, signal colors that would be hard to see on the dark paper (such as deep purple) are lightened on screen only; the saved colors and exported images are unchanged.
+The "Theme" button cycles through Auto (follows your OS light/dark setting), Light and Dark. Your choice is remembered, except for Auto. SVG and PNG use the current theme and its background. In Dark, signal colors that are hard to see are lightened on screen and in exports; saved signal colors remain unchanged.
 
 ### Zooming the view
 
@@ -101,7 +101,7 @@ Right-click on the diagram to open a menu with the actions available at that spo
 
 With a quantity of 2 or more, **ports are shown for every unit**, so each unit can be connected to a different destination. Tooltips show which unit, such as "LAN (Unit 3)". If lowering the quantity would remove connected ports, you are asked to confirm.
 
-The quantity can be **1 to 999**, and a device can have at most **5000 ports in total** (counting every unit). Larger values are refused (the limit keeps the screen from freezing). A diagram file that exceeds the limit cannot be opened.
+The quantity can be **1 to 999**, and a device can have at most **5000 visible ports in total** (counting every unit). The nominal number per unit, including skipped ports, is limited to 50,000. Larger values are refused to keep the screen responsive. A diagram file that exceeds these limits cannot be opened.
 
 ## 4. Port settings
 
@@ -115,8 +115,10 @@ Select a device and the "Ports" section lists its port **groups**. Each group ha
 | Count | Number of ports |
 | Connections | "One" or "Multiple" (normally one) |
 | Display name | The port's name. A group with a single port has no number ("LAN"); two or more are numbered ("LAN 1") |
+| Starting number | First displayed number, from 0 to 9999 |
 
 - "Add port" adds a group. Changes apply to that device only; other devices of the same kind are unchanged.
+- Right-click a port to remove it. To remove several on one device, select ports with Shift-drag and right-click one of them. Connected lines are counted in a confirmation. Numbers of the remaining ports do not change. Restore individual skipped numbers in the Ports panel; their connections are not restored. For multiple units the same number is removed from every unit.
 - A port marker is hollow when free and filled with the signal color when connected. **Hover** over a port to see its name.
 - **Move a single port**: hold Shift and drag the port. It is placed on the nearest side at a grid position. It cannot be placed where another port already is. "Reset port positions to automatic" in the panel undoes this.
 

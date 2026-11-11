@@ -392,16 +392,24 @@ export function setPortGroups(
     if (!page) return fail('unknown-page');
     const node = page.nodes.find((n) => n.id === nodeId);
     if (!node) return fail('unknown-node');
-    if (!validGroups(doc, groups)) return fail('invalid-port-groups');
-    if (exceedsPortLimit(groups, node.count ?? 1)) return fail('invalid-port-groups');
+    const normalized = groups.map((g) => {
+      const next = { ...g };
+      if (next.skipped) {
+        next.skipped = next.skipped.filter((n) => n <= next.count);
+        if (!next.skipped.length) delete next.skipped;
+      }
+      return next;
+    });
+    if (!validGroups(doc, normalized)) return fail('invalid-port-groups');
+    if (exceedsPortLimit(normalized, node.count ?? 1)) return fail('invalid-port-groups');
 
-    const lost = lostEdgeIds(doc, pageId, nodeId, groups);
+    const lost = lostEdgeIds(doc, pageId, nodeId, normalized);
     if (lost.length > 0 && !options.removeOrphanEdges) return fail('ports-in-use');
     const lostSet = new Set(lost);
     page.edges = page.edges.filter((e) => !lostSet.has(e.id));
 
-    node.portGroupsOverride = structuredClone([...groups]);
-    pruneStalePlacements(node, groups);
+    node.portGroupsOverride = structuredClone(normalized);
+    pruneStalePlacements(node, normalized);
     growToFit(node, doc);
     return OK;
   };

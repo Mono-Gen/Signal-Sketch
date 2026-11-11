@@ -101,7 +101,7 @@ const toHex = (rgb: readonly number[]): string => '#' + rgb.map((c) => Math.roun
 /** 白との混ぜ具合 t(0〜1)で明るくする。色相をなるべく保つため、白へ近づける方向だけに動かす */
 const mixWhite = (rgb: readonly number[], t: number): number[] => rgb.map((c) => c + (255 - c) * t);
 
-/** 信号色を、テーマの用紙の上で 3:1(図形の基準)以上に見えるよう補正した画面用の色。保存データ・出力の色は変えない */
+/** 信号色を、テーマの用紙の上で 3:1(図形の基準)以上に見えるよう補正する。保存データは変えない */
 export const SIGNAL_MIN_CONTRAST = 3;
 export function signalColor(theme: Theme, color: string): string {
   if (theme.signalPaper === null || !HEX.test(color)) return color;

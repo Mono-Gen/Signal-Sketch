@@ -693,6 +693,11 @@ export class DiagramView {
     return this.ports.getPortSelection();
   }
 
+  portAt(ev: MouseEvent): PortRef | undefined {
+    const id = this.cellIdAt(ev);
+    return id ? this.portInfo.get(id) : undefined;
+  }
+
   /** ポートの選択を解除する(notify=false なら通知しない) */
   clearPortSelection(notify = true): void {
     this.ports.clearPortSelection(notify);

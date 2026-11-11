@@ -5,6 +5,7 @@ import type { AlignMode, DistributeAxis } from '../model/align';
 // 右クリックメニューの項目を、選択の状態から作る(DOM を持たない純関数。実行は contextMenu.ts が行う)。
 
 export type MenuCommand =
+  | { type: 'removePorts' }
   | { type: 'copy' }
   | { type: 'duplicate' }
   | { type: 'delete' }
@@ -19,6 +20,7 @@ export type MenuItem =
       kind: 'item';
       command: MenuCommand;
       labelKey: MessageKey;
+      label?: string;
       /** 右端に出すショートカット(「Ctrl+C」など)。ないものは省略 */
       shortcut?: string;
       /** 押せない項目。理由は reasonKey で title に出す */

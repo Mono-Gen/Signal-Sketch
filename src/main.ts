@@ -180,7 +180,7 @@ function refresh(): void {
 
 store.subscribe(refresh);
 
-// 画面の配色(自動/ライト/ダーク)。出力する画像には影響しない(常に明るい配色)
+// 画面と画像の配色(自動/ライト/ダーク)。
 const themeBtn = $<HTMLButtonElement>('btn-theme');
 const THEME_LABEL: Record<'auto' | 'light' | 'dark', MessageKey> = { auto: 'toolbar.themeAuto', light: 'toolbar.themeLight', dark: 'toolbar.themeDark' };
 function syncThemeButton(): void {
@@ -203,7 +203,7 @@ themeBtn.addEventListener('click', () => {
   syncThemeButton();
 });
 
-const files = createFileCommands({ store, view, pageId: PAGE_ID, setStatus });
+const files = createFileCommands({ store, view, pageId: PAGE_ID, setStatus, getTheme: () => currentTheme });
 const importCsv = createCsvImport({ store, pageId: PAGE_ID, apply, setStatus, selectItems: (nodeIds, frameIds) => view.selectItems(nodeIds, frameIds) });
 const clipboard = createClipboardCommands({ store, view, pageId: PAGE_ID, apply, setStatus });
 installContextMenu({ container: graphEl, view, store, pageId: PAGE_ID, apply, setStatus, clipboard });

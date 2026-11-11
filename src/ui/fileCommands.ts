@@ -6,12 +6,19 @@ import { buildSvg, svgToPng } from '../io/svgExport';
 import type { DocumentStore } from '../state/store';
 import type { DiagramView } from '../view/diagramView';
 import type { SetStatus } from './statusBar';
+import { themeFor } from '../view/theme';
+import type { ThemeName } from '../view/theme';
+
+export function exportBackground(theme: ThemeName): string {
+  return themeFor(theme).signalPaper ?? '#ffffff';
+}
 
 export interface FileCommandsDeps {
   store: DocumentStore;
   view: DiagramView;
   pageId: string;
   setStatus: SetStatus;
+  getTheme(): ThemeName;
 }
 
 export interface FileCommands {
@@ -80,6 +87,7 @@ export function createFileCommands(deps: FileCommandsDeps): FileCommands {
         return ctx.measureText(text).width;
       };
       const svg = buildSvg(store.doc, pageId, {
+        theme: themeFor(deps.getTheme()),
         measureText,
         edgePoints: view.getEdgePoints(),
         countText: (count) => t('node.count', { count }),
@@ -88,7 +96,7 @@ export function createFileCommands(deps: FileCommandsDeps): FileCommands {
       const outcome =
         kind === 'svg'
           ? await saveFile(svg, 'diagram.svg', SVG_FORMAT)
-          : await saveFile(await svgToPng(svg, page.size.w, page.size.h + 40), 'diagram.png', PNG_FORMAT);
+          : await saveFile(await svgToPng(svg, page.size.w, page.size.h + 40, 2, exportBackground(deps.getTheme())), 'diagram.png', PNG_FORMAT);
       if (outcome !== 'cancelled') setStatus('ok', t('status.imageExported'));
     } catch (err) {
       reportSaveError(err);

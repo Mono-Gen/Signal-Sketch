@@ -35,14 +35,36 @@ export const MAX_UNITS = 999;
  */
 export const MAX_PORTS_PER_NODE = 5000;
 
+/** 展開の繰り返しを制限するため、欠番を含む1台あたりの公称個数にも上限を設ける。 */
+export const MAX_NOMINAL_PORTS_PER_UNIT = 50000;
+
+/** 不正な欠番は差し引かず、後段の検証で拒否する。 */
+export function realPortCount(count: unknown, skipped: unknown): number {
+  if (typeof count !== 'number' || !Number.isFinite(count) || count <= 0) return 0;
+  if (!Number.isInteger(count) || count > MAX_NOMINAL_PORTS_PER_UNIT || !Array.isArray(skipped) || skipped.length > count) return count;
+  let previous = 0;
+  for (const value of skipped) {
+    if (!Number.isInteger(value) || value <= previous || value > count) return count;
+    previous = value;
+  }
+  return count - skipped.length;
+}
+
 /**
  * 台数とポート構成が、上限を超えるか(展開する前に判定する。展開してから調べると、その展開で固まるため)。
  * 台数が整数でない・範囲外のときも、超えるものとして扱う。
  */
-export function exceedsPortLimit(groups: readonly Pick<PortGroup, 'count'>[], units: number): boolean {
+export function exceedsPortLimit(groups: readonly Pick<PortGroup, 'count' | 'skipped'>[], units: number): boolean {
   if (!Number.isInteger(units) || units < 1 || units > MAX_UNITS) return true;
-  const perUnit = groups.reduce((sum, g) => sum + (typeof g.count === 'number' && Number.isFinite(g.count) && g.count > 0 ? g.count : 0), 0);
-  return perUnit * units > MAX_PORTS_PER_NODE;
+  let nominal = 0;
+  let actual = 0;
+  for (const g of groups) {
+    nominal += typeof g.count === 'number' && Number.isFinite(g.count) && g.count > 0 ? g.count : 0;
+    if (nominal > MAX_NOMINAL_PORTS_PER_UNIT) return true;
+    actual += realPortCount(g.count, g.skipped);
+    if (actual * units > MAX_PORTS_PER_NODE) return true;
+  }
+  return false;
 }
 
 /** ポートIDは「グループID-番号」。接続(Edge)はこのIDでポートを指す */
@@ -54,12 +76,13 @@ export function portId(groupId: string, index: number): string {
  * ポートの表示名。ポートが1つだけのグループには番号を付けない(区別する相手がいないため。「LAN」「IN」)。
  * 2つ以上なら「表示名+番号」。表示名が空で番号も付けない場合は、空にせず番号を使う。
  */
-export function portLabel(group: Pick<PortGroup, 'labelPrefix' | 'count'>, index: number): string {
+export function portLabel(group: Pick<PortGroup, 'labelPrefix' | 'count' | 'startNumber'>, index: number): string {
+  const number = (group.startNumber ?? 1) + index - 1;
   if (group.count === 1) {
     const bare = group.labelPrefix.trim();
-    return bare !== '' ? bare : String(index);
+    return bare !== '' ? bare : String(number);
   }
-  return `${group.labelPrefix}${index}`;
+  return `${group.labelPrefix}${number}`;
 }
 
 /**
@@ -67,6 +90,7 @@ export function portLabel(group: Pick<PortGroup, 'labelPrefix' | 'count'>, index
  * 不正な個数や重複したグループIDは、黙って直さず例外にする(Fail-Fast)。
  */
 export function expandPortGroups(groups: readonly PortGroup[]): Port[] {
+  if (groups.reduce((sum, g) => sum + (typeof g.count === 'number' && Number.isFinite(g.count) && g.count > 0 ? g.count : 0), 0) > MAX_NOMINAL_PORTS_PER_UNIT) throw new RangeError('Nominal port count exceeds safety limit');
   const seen = new Set<string>();
   const ports: Port[] = [];
   for (const g of groups) {
@@ -77,7 +101,11 @@ export function expandPortGroups(groups: readonly PortGroup[]): Port[] {
     if (!Number.isInteger(g.count) || g.count < 0) {
       throw new RangeError(`ポート数が不正です(0以上の整数): ${g.id} = ${g.count}`);
     }
+    if (g.startNumber !== undefined && (!Number.isInteger(g.startNumber) || g.startNumber < 0 || g.startNumber > 9999)) throw new RangeError(`Invalid startNumber: ${g.id}`);
+    if (g.skipped !== undefined && (!Array.isArray(g.skipped) || realPortCount(g.count, g.skipped) !== g.count - g.skipped.length)) throw new RangeError(`Invalid skipped: ${g.id}`);
+    const skipped = new Set(g.skipped);
     for (let n = 1; n <= g.count; n++) {
+      if (skipped.has(n)) continue;
       ports.push({
         id: portId(g.id, n),
         groupId: g.id,
