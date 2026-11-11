@@ -1,5 +1,5 @@
 import { t } from '../i18n';
-import { CSV_FORMAT, PNG_FORMAT, SVG_FORMAT, readTextFile, saveFile, saveTextFile } from '../io/browserFile';
+import { CSV_FORMAT, PNG_FORMAT, SVG_FORMAT, isLikelyLockedError, readTextFile, saveFile, saveTextFile } from '../io/browserFile';
 import { buildDeviceCsv, CSV_BOM } from '../io/csvExport';
 import { MAX_DOCUMENT_BYTES, parseDocument, serializeDocument } from '../io/fileIo';
 import { buildSvg, svgToPng } from '../io/svgExport';
@@ -30,6 +30,12 @@ export interface FileCommands {
 export function createFileCommands(deps: FileCommandsDeps): FileCommands {
   const { store, view, pageId, setStatus } = deps;
 
+  /** 保存の失敗を画面に出す。他のアプリが開いているらしいときは、対処を添える */
+  const reportSaveError = (err: unknown): void => {
+    const reason = (err as Error).message;
+    setStatus('error', t(isLikelyLockedError(err) ? 'status.saveLocked' : 'status.saveFailed', { reason }));
+  };
+
   const confirmDiscard = () => !store.isDirty || window.confirm(t('confirm.discard'));
 
   async function save(): Promise<void> {
@@ -39,7 +45,7 @@ export function createFileCommands(deps: FileCommandsDeps): FileCommands {
       store.markSaved();
       setStatus('ok', t(outcome === 'saved' ? 'status.saved' : 'status.savedByDownload'));
     } catch (err) {
-      setStatus('error', t('status.saveFailed', { reason: (err as Error).message }));
+      reportSaveError(err);
     }
   }
 
@@ -57,7 +63,7 @@ export function createFileCommands(deps: FileCommandsDeps): FileCommands {
       const outcome = await saveTextFile(CSV_BOM + csv, 'devices.csv', CSV_FORMAT);
       if (outcome !== 'cancelled') setStatus('ok', t('status.csvExported'));
     } catch (err) {
-      setStatus('error', t('status.saveFailed', { reason: (err as Error).message }));
+      reportSaveError(err);
     }
   }
 
@@ -85,7 +91,7 @@ export function createFileCommands(deps: FileCommandsDeps): FileCommands {
           : await saveFile(await svgToPng(svg, page.size.w, page.size.h + 40), 'diagram.png', PNG_FORMAT);
       if (outcome !== 'cancelled') setStatus('ok', t('status.imageExported'));
     } catch (err) {
-      setStatus('error', t('status.saveFailed', { reason: (err as Error).message }));
+      reportSaveError(err);
     }
   }
 

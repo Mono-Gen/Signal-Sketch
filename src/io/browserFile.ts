@@ -2,7 +2,7 @@
 // File System Access API が使えれば上書き保存でき、使えなければダウンロードにフォールバックする(設計書 3章)。
 
 interface SaveHandle {
-  createWritable(): Promise<{ write(data: string | Blob): Promise<void>; close(): Promise<void> }>;
+  createWritable(): Promise<{ write(data: string | Blob): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }>;
 }
 type SavePicker = (options: {
   suggestedName: string;
@@ -25,6 +25,16 @@ export type SaveOutcome = 'saved' | 'downloaded' | 'cancelled';
 const pickerOf = (): SavePicker | undefined => (window as unknown as { showSaveFilePicker?: SavePicker }).showSaveFilePicker;
 
 /**
+ * 他のアプリがファイルを開いていて、上書きできなかった可能性が高い失敗か。
+ * ブラウザは理由を細かく教えないので、書き込み不可・状態不正・読み取り不可の名前で推定する
+ * (推定なので、画面の文言は「かもしれません」にとどめる)。
+ */
+export function isLikelyLockedError(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === 'NoModificationAllowedError' || name === 'InvalidStateError' || name === 'NotReadableError';
+}
+
+/**
  * データ(文字列またはBlob)を保存する。保存ダイアログを取り消した場合は 'cancelled'。
  * それ以外の失敗は握りつぶさず、例外として呼び出し側へ伝える。
  */
@@ -37,8 +47,15 @@ export async function saveFile(data: string | Blob, suggestedName: string, forma
         types: [{ description: format.description, accept: { [format.mime]: [format.extension] } }],
       });
       const writable = await handle.createWritable();
-      await writable.write(data);
-      await writable.close();
+      try {
+        await writable.write(data);
+        await writable.close();
+      } catch (err) {
+        // 書き込みの途中で失敗したら、書きかけの一時ファイルを残さない(元のファイルは置き換え前なので、そのまま残る)。
+        // 後始末の失敗で、元の失敗の理由を隠さない
+        await writable.abort?.().catch(() => undefined);
+        throw err;
+      }
       return 'saved';
     } catch (err) {
       if ((err as Error).name === 'AbortError') return 'cancelled';

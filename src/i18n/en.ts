@@ -57,6 +57,7 @@ const en: Record<MessageKey, string> = {
   'status.saved': 'Saved',
   'status.savedByDownload': 'Saved as a download',
   'status.saveFailed': 'Failed to save: {reason}',
+  'status.saveLocked': 'Could not save: {reason} (The file may be open in another app, which can block overwriting. Close it and save again, or save under a different name. The original file was not changed)',
   'status.loaded': 'Loaded: {nodes} devices / {edges} connections',
   'status.loadFailed': 'Could not load the file: {reason}',
   'status.connected': 'Connected',

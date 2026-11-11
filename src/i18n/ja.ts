@@ -56,6 +56,7 @@ const ja = {
   'status.saved': '保存しました',
   'status.savedByDownload': 'ダウンロードとして保存しました',
   'status.saveFailed': '保存に失敗しました: {reason}',
+  'status.saveLocked': '保存できませんでした: {reason}(他のアプリでこのファイルを開いていると、上書きできないことがあります。閉じてからもう一度保存するか、別の名前で保存してください。元のファイルは変更されていません)',
   'status.loaded': '読み込みました: 機器 {nodes} 台 / 接続 {edges} 本',
   'status.loadFailed': '読み込めませんでした: {reason}',
   'status.connected': '接続しました',
