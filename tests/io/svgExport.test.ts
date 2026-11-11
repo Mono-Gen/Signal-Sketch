@@ -50,16 +50,17 @@ describe('buildSvg', () => {
     const svg = buildSvg(doc, P, opts(doc));
     expect(count(svg, /<polygon /g)).toBe(5);
     expect(count(svg, /<polygon[^>]*fill="none"/g)).toBe(2);
-    expect(svg).toContain('>P5</text>');
-    expect(svg).not.toContain('>P6</text>');
-    expect(svg).toContain('>P7</text>');
+    expect(svg).toContain('>5</text>'); // 番号だけ(接頭辞は出さない)
+    expect(svg).not.toContain('>6</text>'); // 欠番
+    expect(svg).toContain('>7</text>');
+    expect(svg).not.toContain('>P5</text>');
     expect(svg).toContain('>Only</text>');
     const polygon = svg.match(/<polygon points="([^"]+)"/)![1].split(' ').map((p) => p.split(',').map(Number));
     expect(polygon).toHaveLength(4);
     expect(polygon[0][1]).toBe(polygon[1][1]);
     expect(polygon[1][0]).toBe(polygon[2][0]);
     n.showPortLabels = false;
-    expect(buildSvg(doc, P, opts(doc))).not.toContain('>P5</text>');
+    expect(buildSvg(doc, P, opts(doc))).not.toContain('>5</text>');
   });
   it('暗い信号色を線・ポート・凡例で同じように補正し、空きポートを用紙色にする', () => {
     const doc = createSampleDocument();
