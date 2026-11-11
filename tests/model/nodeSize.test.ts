@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoNodeSize, estimateTextWidth } from '../../src/model/nodeSize';
+import { autoNodeSize, DEFAULT_NODE_HEIGHT, estimateTextWidth } from '../../src/model/nodeSize';
 import { layoutPorts } from '../../src/model/portLayout';
 import { expandPortGroups } from '../../src/model/ports';
 import type { PortGroup, Side } from '../../src/model/types';
@@ -104,5 +104,12 @@ describe('autoNodeSize(ポート番号を表示するときの高さの下限)',
   it('番号を表示しないときは、これまでと同じ', () => {
     const groups = [g('t', 'top', 1), g('b', 'bottom', 8)];
     expect(size(groups, 'Dev', 'Model-X').h).toBe(50);
+  });
+});
+
+describe('DEFAULT_NODE_HEIGHT(新しく置く機器の標準の高さ)', () => {
+  it('下限(50)より大きい60で、下限そのものは変えない(保存済みの機器が勝手に大きくならないように)', () => {
+    expect(DEFAULT_NODE_HEIGHT).toBe(60);
+    expect(size([])).toEqual({ w: 120, h: 50 });
   });
 });

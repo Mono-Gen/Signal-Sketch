@@ -2,7 +2,7 @@ import { addNodeFromTemplate, setPortGroups, updateNode } from './actions';
 import type { Action, ActionResult } from './actions';
 import { ceilToGrid } from './grid';
 import { uniqueId } from './ids';
-import { autoNodeSize, estimateTextWidth } from './nodeSize';
+import { autoNodeSize, DEFAULT_NODE_HEIGHT, estimateTextWidth } from './nodeSize';
 import { getPage } from './query';
 import { switchPortGroups, VARIABLE_PORT_PRESET_ID } from './presets';
 import type { DeviceTemplate, PortGroup } from './types';
@@ -74,7 +74,7 @@ export function importDevices(pageId: string, rows: readonly ImportRow[], option
       const groups = effectiveGroups(row, tpl);
       const size = autoNodeSize({ groups, label: row.name, model: row.model, grid: g, units: row.quantity > 1 ? row.quantity : undefined });
       const list = buckets.get(row.place) ?? [];
-      list.push({ row, tpl, groups, w: size.w, h: size.h, x: 0, y: 0 });
+      list.push({ row, tpl, groups, w: size.w, h: Math.max(size.h, DEFAULT_NODE_HEIGHT), x: 0, y: 0 });
       buckets.set(row.place, list);
     }
     const order = [...buckets.keys()].filter((k) => k !== '');

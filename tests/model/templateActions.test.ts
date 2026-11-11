@@ -155,13 +155,15 @@ describe('登録テンプレートから置く', () => {
     expect(placed.every((node) => node.w === 240 && node.h === 160 && node.imageId === 'img-a')).toBe(true);
   });
 
-  it('size/imageId のない標準テンプレートは、従来どおり自動サイズで画像なし', () => {
+  it('size/imageId のない標準テンプレートは、自動サイズ(高さは標準の60以上)で画像なし', () => {
     const doc = createEmptyDocument();
     const template = speakerTemplate();
-    const expected = autoNodeSize({ groups: template.portGroups, label: template.name, model: '', grid: doc.grid.size });
+    const auto = autoNodeSize({ groups: template.portGroups, label: template.name, model: '', grid: doc.grid.size });
     const result = addNodeFromTemplate(PAGE_ID, template, template.name)(doc);
     const placed = doc.pages[0].nodes.find((node) => node.id === result.created)!;
-    expect({ w: placed.w, h: placed.h }).toEqual(expected);
+    // 新しく置く機器の高さは、最小(50)より少し大きい標準の60(ポートが多くて最小がそれ以上なら、その高さ)
+    expect({ w: placed.w, h: placed.h }).toEqual({ w: auto.w, h: Math.max(auto.h, 60) });
+    expect(placed.h).toBeGreaterThanOrEqual(60);
     expect(placed.imageId).toBeUndefined();
   });
 });

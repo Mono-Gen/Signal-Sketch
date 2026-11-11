@@ -1,7 +1,7 @@
 import { DEFAULT_SIGNAL_TYPES } from './defaults';
 import { snap } from './grid';
 import { uniqueId } from './ids';
-import { autoNodeSize } from './nodeSize';
+import { autoNodeSize, DEFAULT_NODE_HEIGHT } from './nodeSize';
 import { findFreePosition } from './placement';
 import { connectionIssues } from './diagnostics';
 import { exceedsPortLimit, expandPortGroups, expandUnits } from './ports';
@@ -72,7 +72,7 @@ function templatePlacementSize(
 ): { w: number; h: number } | null {
   const minimum = autoNodeSize({ groups: template.portGroups, label, model: '', grid: doc.grid.size });
   if (minimum.w > pageSize.w || minimum.h > pageSize.h) return null;
-  const preferred = template.size ?? minimum;
+  const preferred = template.size ?? { w: minimum.w, h: Math.max(minimum.h, DEFAULT_NODE_HEIGHT) };
   return {
     w: Math.min(Math.max(preferred.w, minimum.w), pageSize.w),
     h: Math.min(Math.max(preferred.h, minimum.h), pageSize.h),

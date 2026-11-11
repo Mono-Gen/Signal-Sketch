@@ -27,6 +27,11 @@ export interface SizeInput {
 
 const MIN_NODE_WIDTH = 120;
 const MIN_NODE_HEIGHT = 50;
+/**
+ * 新しく置く機器の標準の高さ(最小より少し大きい)。ポート番号を出したときも、名前や上下の番号が重なりにくくする。
+ * 下限(MIN_NODE_HEIGHT)は変えない: 変えると、保存済みの機器が、名前の変更などで勝手に大きくなる。
+ */
+export const DEFAULT_NODE_HEIGHT = 60;
 const DEFAULT_TEXT_INSET = 24 + 14 + 12;
 /** アイコンの高さと、その上の余白(画面・書き出しの描き方と同じ) */
 const ICON_BLOCK = 8 + 24;
