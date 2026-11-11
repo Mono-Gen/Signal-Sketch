@@ -10,7 +10,7 @@ import { uniqueId } from '../model/ids';
 import { PAGE_SIZE_PRESETS, presetIndexOf } from '../model/pageSize';
 import { getNodePorts, getPage, getTemplate } from '../model/query';
 import { resolvePortGroups } from '../model/ports';
-import { addSignalType, isHexColor, moveSignalType, orderedSignalTypes, reassignAndRemoveSignalType, recreateSignalColor, removeSignalType, setSignalParent, signalUsageDetails, updateSignalType } from '../model/signalActions';
+import { addSignalType, isHexColor, moveSignalType, orderedSignalTypes, reassignAndRemoveSignalType, removeSignalType, signalUsageDetails, updateSignalType } from '../model/signalActions';
 import type { Direction, DiagramDocument, DiagramNode, PortGroup, Side } from '../model/types';
 import { prepareImage } from '../io/imageImport';
 import { clearNodesImage, resizeNode, setNodesImage } from '../model/imageActions';
@@ -410,7 +410,6 @@ export class PropertiesPanel {
 
   private legendSection(doc: DiagramDocument): HTMLElement {
     const section = el('div', { className: 'section' }, [el('h3', { text: t('legend.edit') })]);
-    const roots = doc.signalTypes.filter((s) => !s.parent);
     const ordered = orderedSignalTypes(doc.signalTypes);
     for (const s of ordered) {
       const peers = ordered.filter((x) => x.parent === s.parent);
@@ -430,22 +429,15 @@ export class PropertiesPanel {
       line.setAttribute('aria-label', t('legend.lineLabel'));
       line.setAttribute('data-prop', 'signal-line');
       line.addEventListener('change', () => this.ctx.apply(updateSignalType(s.id, { lineStyle: line.value as LineStyle })));
-      const parent = select([{ value: '', label: t('legend.noParent') }, ...roots.filter((r) => r.id !== s.id).map((r) => ({ value: r.id, label: r.label }))], s.parent ?? '');
-      parent.setAttribute('aria-label', t('legend.parent'));
-      parent.setAttribute('data-prop', 'signal-parent');
-      if (children.length) parent.disabled = true;
-      parent.addEventListener('change', () => { if (!this.ctx.apply(setSignalParent(s.id, parent.value || null)).ok) this.update(null); });
       const button = (text: string, action: string, disabled: boolean, click: () => void, aria = text) =>
         el('button', { text, attrs: { type: 'button', 'aria-label': aria, 'data-action': action, ...(disabled ? { disabled: '' } : {}) }, on: { click } });
       const main = el('div', { className: 'legend-row-main' }, [color, label,
         button(t('legend.up'), 'signal-up', i === 0, () => this.ctx.apply(moveSignalType(s.id, -1)), t('legend.upLabel')),
         button(t('legend.down'), 'signal-down', i === peers.length - 1, () => this.ctx.apply(moveSignalType(s.id, 1)), t('legend.downLabel'))]);
-      const sub = el('div', { className: 'legend-row-sub' }, [line, parent]);
+      const sub = el('div', { className: 'legend-row-sub' }, [line]);
       row.append(main, sub);
-      if (s.parent) sub.append(button(t('legend.recreate'), 'signal-recreate', false, () => {
-        this.ctx.apply(recreateSignalColor(s.id));
-      }));
-      else sub.append(button(t('legend.addChild'), 'signal-add-child', false, () => this.ctx.apply(addSignalType(t('legend.newLabel'), s.color, s.id))));
+      // 追加できるのは、親(1段目)の下のサブだけ。サブの親は、追加したときに決まり、あとから付け替えない
+      if (!s.parent) sub.append(button(t('legend.addChild'), 'signal-add-child', false, () => this.ctx.apply(addSignalType(t('legend.newLabel'), s.color, s.id))));
       sub.append(button(t('legend.remove'), 'signal-remove', false, () => {
         if (children.length) { this.ctx.setStatus('error', t('legend.children')); return; }
         if (!usage.devices.length && !usage.templates.length) { this.ctx.apply(removeSignalType(s.id)); return; }
@@ -724,7 +716,8 @@ export class PropertiesPanel {
   }
 
   private signalSelect(doc: DiagramDocument, g: PortGroup, on: (v: string) => void): HTMLSelectElement {
-    const s = select(doc.signalTypes.map((x) => ({ value: x.id, label: x.label })), g.signalType);
+    // 親の下にサブを字下げして並べる(凡例と同じ並び)
+    const s = select(orderedSignalTypes(doc.signalTypes).map((x) => ({ value: x.id, label: x.parent ? `　└ ${x.label}` : x.label })), g.signalType);
     s.setAttribute('data-prop', 'port-signal');
     s.addEventListener('change', () => on(s.value));
     return s;
