@@ -74,6 +74,7 @@
     button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     label.toggle { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+    .section label.toggle { margin: 0 0 8px; }
     /* 長い文でもツールバーを折り返させない(折り返すとキャンバスが跳ねる)。省略した全文は title に入る */
     #status { flex: 1 1 0; min-width: 8em; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; min-height: 1.4em; }
     #status[data-kind="ok"] { color: var(--ok); }

@@ -645,7 +645,8 @@ export class PropertiesPanel {
         attrs: { type: 'checkbox', 'data-prop': 'show-port-labels', ...(node.showPortLabels ? { checked: '' } : {}) },
         on: { change: (ev) => this.ctx.apply(updateNode(this.ctx.pageId, node.id, { showPortLabels: (ev.target as HTMLInputElement).checked })) },
       });
-      section.append(field(t('props.showPortLabels'), checkbox));
+      // チェックは文字の横に置く(欄の見出しの下に、右端へ寄せない)
+      section.append(el('label', { className: 'toggle' }, [checkbox, el('span', { text: t('props.showPortLabels') })]));
     }
 
     const commit = (next: PortGroup[]) => {
