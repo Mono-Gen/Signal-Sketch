@@ -20,10 +20,11 @@ describe('markerSpec(設計書 5.3: 入力=内向き三角 / 出力=外向き三
   });
 });
 
-it('各辺のラベルをマークの内側に置く', () => {
+it('各辺のラベルの位置: 左右下はマークの内側、上辺は機器の外', () => {
   expect(portLabelPosition('left', 50, 50, 10)).toEqual({ x: 59, y: 50, align: 'left' });
   expect(portLabelPosition('right', 50, 50, 10)).toEqual({ x: 41, y: 50, align: 'right' });
-  expect(portLabelPosition('top', 50, 50, 10)).toEqual({ x: 50, y: 63, align: 'center' });
+  // 上辺は機器の外(上)に出す: 機器の名前と重ならないように
+  expect(portLabelPosition('top', 50, 50, 10)).toEqual({ x: 50, y: 37, align: 'center' });
   expect(portLabelPosition('bottom', 50, 50, 10)).toEqual({ x: 50, y: 37, align: 'center' });
 });
 
