@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseDocument, serializeDocument } from '../../src/io/fileIo';
 import { documentLimitIssue, MAX_EDGES_PER_PAGE, MAX_NODES_PER_PAGE, MAX_PORTS_PER_PAGE } from '../../src/model/docLimits';
+import { expandPortGroups } from '../../src/model/ports';
 import { validateDocument } from '../../src/model/validate';
 import { createSampleDocument } from '../fixtures/sampleDocument';
 
@@ -17,15 +18,17 @@ function withNodes(count: number, templateId: string) {
 }
 
 describe('documentLimitIssue: ページ全体の上限', () => {
-  it('欠番を除いた実ポート数で数え、不正な欠番は差し引かない', () => {
+  it('旧形式の欠番情報を無視して全ポートと接続を読み込む', () => {
     const doc = createSampleDocument();
-    const node = doc.pages[0].nodes[0];
-    const group = { id: 'g', signalType: 'USB', direction: 'out' as const, side: 'right' as const, count: 24, labelPrefix: 'P', skipped: Array.from({ length: 12 }, (_, i) => i + 1) };
-    doc.pages[0].nodes = Array.from({ length: 5 }, (_, i) => ({ ...node, id: `gap-${i}`, count: 300, portGroupsOverride: [group] }));
-    doc.pages[0].edges = [];
-    expect(documentLimitIssue(doc)).toBeNull(); // 12 × 300 × 5 = 18000
-    group.skipped = [1, 1];
-    expect(documentLimitIssue(doc)).toBe('ports'); // 不正なので 24 × 300 × 5
+    const group = doc.deviceTemplates.find((t) => t.id === 'switch')!.portGroups[0];
+    Object.assign(group, { skipped: [1] });
+    const result = parseDocument(JSON.stringify(doc));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.errors.join(', '));
+    expect(validateDocument(result.doc).ok).toBe(true);
+    const loaded = result.doc.deviceTemplates.find((t) => t.id === 'switch')!.portGroups[0];
+    expect(expandPortGroups([loaded]).map((p) => p.id)).toEqual(Array.from({ length: group.count }, (_, i) => group.id + '-' + (i + 1)));
+    expect(result.doc.pages[0].edges).toEqual(doc.pages[0].edges);
   });
   it('ふつうの図は収まる', () => {
     expect(documentLimitIssue(createSampleDocument())).toBeNull();

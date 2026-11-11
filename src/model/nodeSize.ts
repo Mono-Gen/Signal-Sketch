@@ -28,10 +28,10 @@ const DEFAULT_TEXT_INSET = 24 + 14 + 12;
 
 /** 1辺に並べるポートの枠数。グループの切れ目は1つ分あく(layoutPorts と同じ規則) */
 function slotsOnSide(groups: readonly PortGroup[], side: Side, units: number): number {
-  const used = groups.filter((g) => g.side === side && g.count - (g.skipped?.length ?? 0) > 0);
+  const used = groups.filter((g) => g.side === side && g.count > 0);
   if (used.length === 0) return 0;
   // 台ごとにグループが繰り返され、切れ目(台・グループの切替)ごとに1枠あく
-  return units * used.reduce((sum, g) => sum + g.count - (g.skipped?.length ?? 0), 0) + (units * used.length - 1);
+  return units * used.reduce((sum, g) => sum + g.count, 0) + (units * used.length - 1);
 }
 
 /**

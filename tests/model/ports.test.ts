@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { expandPortGroups, findPort, portId, portLabel, resolvePortGroups } from '../../src/model/ports';
-import type { DeviceTemplate, DiagramNode, PortGroup } from '../../src/model/types';
-import { layoutPorts } from '../../src/model/portLayout';
 import { validateDocument } from '../../src/model/validate';
 import { createSampleDocument } from '../fixtures/sampleDocument';
+import type { DeviceTemplate, DiagramNode, PortGroup } from '../../src/model/types';
 
 const lan = (count: number, over: Partial<PortGroup> = {}): PortGroup => ({
   id: 'lan',
@@ -16,27 +15,11 @@ const lan = (count: number, over: Partial<PortGroup> = {}): PortGroup => ({
 });
 
 describe('expandPortGroups', () => {
-  it('欠番でもIDを維持し開始番号から表示する', () => {
-    const ports = expandPortGroups([lan(8, { skipped: [5, 6], startNumber: 0 })]);
-    expect(ports.map((p) => p.id)).toEqual(['lan-1', 'lan-2', 'lan-3', 'lan-4', 'lan-7', 'lan-8']);
-    expect(ports.map((p) => p.label)).toEqual(['LAN 0', 'LAN 1', 'LAN 2', 'LAN 3', 'LAN 6', 'LAN 7']);
-  });
-
-  it('不正な欠番と開始番号を拒否する', () => {
-    for (const skipped of [[0], [4], [2, 2], [2, 1], [1.5]]) {
-      expect(() => expandPortGroups([lan(3, { skipped })])).toThrow();
-    }
+  it('開始番号を表示し、不正な開始番号を拒否する', () => {
+    expect(expandPortGroups([lan(3, { startNumber: 0 })]).map((p) => p.label)).toEqual(['LAN 0', 'LAN 1', 'LAN 2']);
     for (const startNumber of [-1, 10000, 1.5]) expect(() => expandPortGroups([lan(3, { startNumber })])).toThrow();
     expect(expandPortGroups([lan(2, { startNumber: 9999 })])[1].label).toBe('LAN 10000');
-  });
-
-  it('欠番に空き枠を作らず、ファイル読み込み時にも値を検査する', () => {
-    const ports = expandPortGroups([lan(4, { skipped: [2, 3] })]);
-    expect(layoutPorts(ports, { w: 120, h: 100 }, 10).map((p) => p.y)).toEqual([30, 40]);
     const doc = createSampleDocument();
-    doc.deviceTemplates[0].portGroups[0].skipped = [1, 1];
-    expect(validateDocument(doc).ok).toBe(false);
-    doc.deviceTemplates[0].portGroups[0].skipped = [1];
     doc.deviceTemplates[0].portGroups[0].startNumber = 10000;
     expect(validateDocument(doc).ok).toBe(false);
   });

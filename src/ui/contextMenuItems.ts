@@ -5,7 +5,6 @@ import type { AlignMode, DistributeAxis } from '../model/align';
 // 右クリックメニューの項目を、選択の状態から作る(DOM を持たない純関数。実行は contextMenu.ts が行う)。
 
 export type MenuCommand =
-  | { type: 'removePorts' }
   | { type: 'copy' }
   | { type: 'duplicate' }
   | { type: 'delete' }

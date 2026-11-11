@@ -37,21 +37,21 @@ describe('roundedPath', () => {
 });
 
 describe('buildSvg', () => {
-  it('複数接続の四角形には外枠が付き、番号表示は欠番と開始番号に従う', () => {
+  it('複数接続の四角形には外枠が付き、番号表示は開始番号に従う', () => {
     const doc = createSampleDocument();
     const n = doc.pages[0].nodes.find((v) => v.id === 'sw')!;
     n.showPortLabels = true;
     n.portGroupsOverride = [
-      { id: 'a', signalType: 'LAN', direction: 'inout', side: 'left', count: 3, labelPrefix: 'P', startNumber: 5, skipped: [2], multi: true },
+      { id: 'a', signalType: 'LAN', direction: 'inout', side: 'left', count: 3, labelPrefix: 'P', startNumber: 5, multi: true },
       { id: 'b', signalType: 'LAN', direction: 'inout', side: 'right', count: 1, labelPrefix: 'Only' },
     ];
     doc.pages[0].nodes = [n];
     doc.pages[0].edges = [];
     const svg = buildSvg(doc, P, opts(doc));
-    expect(count(svg, /<polygon /g)).toBe(5);
-    expect(count(svg, /<polygon[^>]*fill="none"/g)).toBe(2);
+    expect(count(svg, /<polygon /g)).toBe(7);
+    expect(count(svg, /<polygon[^>]*fill="none"/g)).toBe(3);
     expect(svg).toContain('>5</text>'); // 番号だけ(接頭辞は出さない)
-    expect(svg).not.toContain('>6</text>'); // 欠番
+    expect(svg).toContain('>6</text>');
     expect(svg).toContain('>7</text>');
     expect(svg).not.toContain('>P5</text>');
     expect(svg).toContain('>Only</text>');

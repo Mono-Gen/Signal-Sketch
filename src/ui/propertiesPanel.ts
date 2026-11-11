@@ -652,10 +652,6 @@ export class PropertiesPanel {
     const commit = (next: PortGroup[]) => {
       next = next.map((group) => {
         const copy = { ...group };
-        if (copy.skipped) {
-          copy.skipped = copy.skipped.filter((n) => n <= copy.count);
-          if (!copy.skipped.length) delete copy.skipped;
-        }
         return copy;
       });
       const lost = ids.flatMap((id) => lostEdgeIds(this.ctx.getDoc(), this.ctx.pageId, id, next));

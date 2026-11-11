@@ -2,8 +2,6 @@ import type { MessageKey } from './ja';
 
 // UI strings (English). User-entered device names and model numbers are not translated.
 const en: Record<MessageKey, string> = {
-  'menu.removePort': 'Remove this port',
-  'menu.removeSelectedPorts': 'Remove {count} selected ports',
   'props.startNumber': 'Starting number',
   'toolbar.new': 'New',
   'toolbar.open': 'Open',

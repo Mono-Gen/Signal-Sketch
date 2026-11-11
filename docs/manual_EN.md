@@ -101,7 +101,7 @@ Right-click on the diagram to open a menu with the actions available at that spo
 
 With a quantity of 2 or more, **ports are shown for every unit**, so each unit can be connected to a different destination. Tooltips show which unit, such as "LAN (Unit 3)". If lowering the quantity would remove connected ports, you are asked to confirm.
 
-The quantity can be **1 to 999**, and a device can have at most **5000 visible ports in total** (counting every unit). The nominal number per unit, including skipped ports, is limited to 50,000. Larger values are refused to keep the screen responsive. A diagram file that exceeds these limits cannot be opened.
+The quantity can be **1 to 999**, and a device can have at most **5000 visible ports in total** (counting every unit). Larger values are refused to keep the screen responsive. A diagram file that exceeds these limits cannot be opened.
 
 ## 4. Port settings
 
@@ -119,7 +119,6 @@ Select a device and the "Ports" section lists its port **groups**. Each group ha
 
 - Check "Show port numbers" to display port numbers beside the markers inside a single selected device (groups with several ports show the number only, without the prefix; a single-port group keeps its name). Multiple-connection ports have an additional outline.
 - "Add port" adds a group. Changes apply to that device only; other devices of the same kind are unchanged.
-- Right-click a port to remove it. To remove several on one device, select ports with Shift-drag and right-click one of them or press **Delete**. Connected lines are counted in a confirmation. Numbers of the remaining ports do not change. Undo restores the removal, including its connections. For multiple units the same number is removed from every unit.
 - A port marker is hollow when free and filled with the signal color when connected (when signals of the same family are connected, the line and both ports take the sub-signal's color; connections between different families keep each port's own color). **Hover** over a port to see its name.
 - **Move a single port**: hold Shift and drag the port. It is placed on the nearest side at a grid position. It cannot be placed where another port already is. "Reset port positions to automatic" in the panel undoes this.
 

@@ -8,7 +8,6 @@ import { buildMenuItems } from './contextMenuItems';
 import type { MenuCommand, MenuItem } from './contextMenuItems';
 import { el } from './dom';
 import type { SetStatus } from './statusBar';
-import { countRemovedPortEdges, removePorts } from '../model/portActions';
 
 /**
  * 右クリックメニュー。表示・キーボード操作・閉じ方(この部品)と、対象に応じた項目の選択・実行(installContextMenu)を持つ。
@@ -161,7 +160,6 @@ export function installContextMenu(deps: ContextMenuDeps): void {
     const nodeIds = view.getSelection().nodeIds;
     const align = { pageId, apply, setStatus };
     switch (command.type) {
-      case 'removePorts': return;
       case 'copy': return clipboard.copy();
       case 'duplicate': return clipboard.duplicate();
       case 'delete': return clipboard.deleteSelection();
@@ -187,23 +185,7 @@ export function installContextMenu(deps: ContextMenuDeps): void {
   container.addEventListener('contextmenu', (ev) => {
     if (document.querySelector('dialog[open]')) return; // ダイアログの上では、標準のまま
     ev.preventDefault();
-    const port = view.portAt(ev);
-    if (port) {
-      const selected = view.getPortSelection();
-      const refs = selected.some((p) => p.nodeId === port.nodeId && p.portId === port.portId)
-        ? selected.filter((p) => p.nodeId === port.nodeId) : [port];
-      const ids = refs.map((p) => p.portId);
-      showContextMenu({
-        x: ev.clientX, y: ev.clientY,
-        items: [{ kind: 'item', command: { type: 'removePorts' }, labelKey: 'menu.removePort', label: refs.length > 1 ? t('menu.removeSelectedPorts', { count: refs.length }) : t('menu.removePort') }],
-        onCommand: () => {
-          const count = countRemovedPortEdges(store.doc, pageId, port.nodeId, ids);
-          if (count && !window.confirm(t('confirm.removePorts', { count }))) return;
-          apply(removePorts(pageId, port.nodeId, ids));
-        },
-      });
-      return;
-    }
+    if (view.portAt(ev)) { atPress = null; return; }
     const target = view.targetAt(ev);
     const pressed = atPress;
     atPress = null;

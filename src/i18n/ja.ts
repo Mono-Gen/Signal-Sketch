@@ -1,8 +1,6 @@
 // UI文言(日本語)。ユーザーが入力する機器名・型番は翻訳しない(設計書 D7)。
 // 文言を追加するときは en.ts にも同じキーを追加する(型とテストで検出される)。
 const ja = {
-  'menu.removePort': 'このポートを削除',
-  'menu.removeSelectedPorts': '選択したポート{count}個を削除',
   'props.startNumber': '開始番号',
   'toolbar.new': '新規',
   'toolbar.open': '開く',

@@ -396,10 +396,6 @@ export function setPortGroups(
     if (!node) return fail('unknown-node');
     const normalized = groups.map((g) => {
       const next = { ...g };
-      if (next.skipped) {
-        next.skipped = next.skipped.filter((n) => n <= next.count);
-        if (!next.skipped.length) delete next.skipped;
-      }
       return next;
     });
     if (!validGroups(doc, normalized)) return fail('invalid-port-groups');

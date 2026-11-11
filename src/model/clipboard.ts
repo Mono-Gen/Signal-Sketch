@@ -102,8 +102,6 @@ function samePortGroups(a: DeviceTemplate['portGroups'], b: DeviceTemplate['port
       group.count === other.count &&
       group.labelPrefix === other.labelPrefix &&
       (group.startNumber ?? 1) === (other.startNumber ?? 1) &&
-      (group.skipped ?? []).length === (other.skipped ?? []).length &&
-      (group.skipped ?? []).every((value, i) => value === other.skipped?.[i]) &&
       group.multi === other.multi
     );
   });

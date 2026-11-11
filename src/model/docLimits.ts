@@ -1,5 +1,4 @@
 import type { DiagramDocument } from './types';
-import { realPortCount } from './ports';
 
 // 図全体の大きさの上限。1機器あたりの上限(ports.ts の MAX_UNITS / MAX_PORTS_PER_NODE)だけでは、
 // 「5000ポートの機器を100台」のような小さなファイルで、数十万個の図形を描こうとして画面が固まる。
@@ -28,7 +27,6 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
  */
 export function documentLimitIssue(doc: Pick<DiagramDocument, 'deviceTemplates' | 'pages'>): DocumentLimitIssue | null {
   const templates = new Map<string, unknown>();
-  const groupCounts = new Map<unknown[], number>();
   for (const t of Array.isArray(doc.deviceTemplates) ? doc.deviceTemplates : []) {
     if (isRecord(t) && typeof t.id === 'string') templates.set(t.id, t);
   }
@@ -43,10 +41,9 @@ export function documentLimitIssue(doc: Pick<DiagramDocument, 'deviceTemplates' 
       if (!isRecord(n)) continue;
       const tpl = typeof n.templateId === 'string' ? templates.get(n.templateId) : undefined;
       const groups = Array.isArray(n.portGroupsOverride) ? n.portGroupsOverride : isRecord(tpl) && Array.isArray(tpl.portGroups) ? tpl.portGroups : [];
-      let perUnit = groupCounts.get(groups);
-      if (perUnit === undefined) {
-        perUnit = groups.reduce((sum: number, g: unknown) => sum + (isRecord(g) ? realPortCount(g.count, g.skipped) : 0), 0);
-        groupCounts.set(groups, perUnit);
+      let perUnit = 0;
+      for (const g of groups) {
+        if (isRecord(g) && typeof g.count === 'number' && Number.isFinite(g.count) && g.count > 0) perUnit += g.count;
       }
       const units = typeof n.count === 'number' && Number.isInteger(n.count) && n.count >= 1 ? n.count : 1;
       ports += perUnit * units;

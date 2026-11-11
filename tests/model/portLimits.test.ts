@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addNodeFromTemplate, lostEdgeIds, lostEdgeIdsForCount, setPortGroups, updateNode } from '../../src/model/actions';
 import { createEmptyDocument } from '../../src/model/defaults';
-import { exceedsPortLimit, MAX_NOMINAL_PORTS_PER_UNIT, MAX_PORTS_PER_NODE, MAX_UNITS } from '../../src/model/ports';
+import { exceedsPortLimit, MAX_PORTS_PER_NODE, MAX_UNITS } from '../../src/model/ports';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
 import { validateDocument } from '../../src/model/validate';
 import { parseDeviceCsv } from '../../src/io/csvImport';
@@ -20,21 +20,6 @@ const timed = <T>(fn: () => T): { value: T; ms: number } => {
 };
 
 describe('exceedsPortLimit', () => {
-  it('欠番を実数から除き、公称数には別の安全上限を設ける', () => {
-    const skipped = Array.from({ length: 12 }, (_, i) => i + 1);
-    expect(exceedsPortLimit([{ ...g(24), skipped }], 300)).toBe(false);
-    expect(exceedsPortLimit([{ ...g(24), skipped: [1, 1] }], 300)).toBe(true);
-    expect(exceedsPortLimit([{ ...g(MAX_NOMINAL_PORTS_PER_UNIT + 1), skipped: Array.from({ length: MAX_NOMINAL_PORTS_PER_UNIT + 1 }, (_, i) => i + 1) }], 1)).toBe(true);
-    const doc = createSampleDocument();
-    const node = doc.pages[0].nodes[0];
-    node.portGroupsOverride = [{ ...g(24), signalType: 'USB', skipped }];
-    node.count = 300;
-    doc.pages[0].edges = [];
-    expect(validateDocument(doc).ok).toBe(true);
-    node.portGroupsOverride[0].count = MAX_NOMINAL_PORTS_PER_UNIT + 1;
-    node.portGroupsOverride[0].skipped = Array.from({ length: MAX_NOMINAL_PORTS_PER_UNIT + 1 }, (_, i) => i + 1);
-    expect(validateDocument(doc).ok).toBe(false);
-  });
   it('台数の範囲(1〜上限の整数)', () => {
     expect(exceedsPortLimit([g(1)], 1)).toBe(false);
     expect(exceedsPortLimit([g(1)], MAX_UNITS)).toBe(false);

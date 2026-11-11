@@ -34,7 +34,6 @@ export interface PortGroup {
   side: Side;
   count: number;
   labelPrefix: string;
-  skipped?: number[];
   startNumber?: number;
   /** 1つのポートに複数の線を接続できる(ハイインピーダンスのスピーカーの並列など)。省略は1本まで */
   multi?: boolean;
