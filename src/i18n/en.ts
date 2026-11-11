@@ -94,7 +94,7 @@ const en: Record<MessageKey, string> = {
   'error.unknownSignal': 'Signal type not found',
   'error.signalInUse': 'This signal type is in use and cannot be deleted (a port on a device in the diagram, or a device type definition, uses it)',
   'legend.addChild': 'Add sub',
-  'legend.children': 'This signal has children. Move or remove them first.',
+  'legend.children': 'This signal has sub-signals and cannot be deleted. Delete the sub-signals first.',
   'legend.usedDevices': 'Devices: {names}',
   'legend.usedTemplates': 'Templates: {names}',
   'legend.more': '{count} more',

@@ -93,7 +93,7 @@ const ja = {
   'error.unknownSignal': '信号の種類が見つかりません',
   'error.signalInUse': 'この信号は使われているため削除できません(図の機器のポート、または機器の種類の定義が使っています)',
   'legend.addChild': 'サブ追加',
-  'legend.children': '子の信号があるため削除できません。先に子を移動または削除してください。',
+  'legend.children': 'サブ信号があるため削除できません。先にサブ信号を削除してください。',
   'legend.usedDevices': '機器: {names}',
   'legend.usedTemplates': 'テンプレート: {names}',
   'legend.more': 'ほか {count} 件',
