@@ -28,3 +28,12 @@ export function findPortByRef(doc: DiagramDocument, ref: PortRef): Port | undefi
 export function layoutNodePorts(doc: DiagramDocument, node: DiagramNode): PortPlacement[] {
   return layoutPorts(getNodePorts(doc, node), { w: node.w, h: node.h }, doc.grid.size, node.portPlacements);
 }
+
+/** 上辺のポートの番号を出すとき、機器の名前とアイコンを下へずらす量(px)。番号が名前に重ならないようにする */
+export const TOP_LABEL_SHIFT = 10;
+
+/** 機器の名前・アイコンを下へずらす量。上辺にポートがあって、番号を表示しているときだけ(他は0) */
+export function headerShift(doc: DiagramDocument, node: DiagramNode): number {
+  if (!node.showPortLabels) return 0;
+  return layoutNodePorts(doc, node).some((p) => p.side === 'top') ? TOP_LABEL_SHIFT : 0;
+}

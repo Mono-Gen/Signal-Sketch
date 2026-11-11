@@ -28,8 +28,7 @@ export function portLabelPosition(side: Side, x: number, y: number, markerSize: 
   const gap = markerSize / 2 + MULTI_OUTLINE_GAP + 2;
   if (side === 'left') return { x: x + gap, y, align: 'left' };
   if (side === 'right') return { x: x - gap, y, align: 'right' };
-  // 上辺は、機器の外(マークの上)に出す。内側には機器の名前が来るため、重なって読めなくなる
-  if (side === 'top') return { x, y: y - gap - PORT_LABEL_SIZE / 2, align: 'center' };
+  if (side === 'top') return { x, y: y + gap + PORT_LABEL_SIZE / 2, align: 'center' };
   return { x, y: y - gap - PORT_LABEL_SIZE / 2, align: 'center' };
 }
 

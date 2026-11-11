@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { expandPortGroups, findPort, portId, portLabel, resolvePortGroups } from '../../src/model/ports';
+import { createEmptyDocument } from '../../src/model/defaults';
+import { headerShift, TOP_LABEL_SHIFT } from '../../src/model/query';
 import { validateDocument } from '../../src/model/validate';
 import { createSampleDocument } from '../fixtures/sampleDocument';
 import type { DeviceTemplate, DiagramNode, PortGroup } from '../../src/model/types';
@@ -118,4 +120,22 @@ it('短い表示名: 複数ポートのグループは番号だけ(開始番号�
   ]);
   expect(ports.map((p) => p.shortLabel)).toEqual(['5', '6', '7', 'HDMI']);
   expect(ports.map((p) => p.label)).toEqual(['LAN5', 'LAN6', 'LAN7', 'HDMI']);
+});
+
+describe('headerShift(上辺の番号を出すときの、名前とアイコンのずらし量)', () => {
+  const docWith = (side: 'top' | 'bottom', show: boolean) => {
+    const doc = createEmptyDocument();
+    doc.deviceTemplates = [{ id: 't', name: 'T', kind: 'switch', shape: 'roundRect', portGroups: [{ id: 'g', signalType: 'LAN', direction: 'inout', side, count: 2, labelPrefix: 'P' }] }];
+    const node = { id: 'n', templateId: 't', label: 'N', model: '', x: 0, y: 0, w: 120, h: 60, ...(show ? { showPortLabels: true } : {}) };
+    return { doc, node };
+  };
+
+  it('上辺にポートがあり、番号を表示しているときだけ、ずらす', () => {
+    const a = docWith('top', true);
+    expect(headerShift(a.doc, a.node)).toBe(TOP_LABEL_SHIFT);
+    const b = docWith('top', false);
+    expect(headerShift(b.doc, b.node)).toBe(0);
+    const c = docWith('bottom', true);
+    expect(headerShift(c.doc, c.node)).toBe(0);
+  });
 });

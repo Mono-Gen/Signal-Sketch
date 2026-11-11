@@ -1,6 +1,6 @@
 import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph, InternalEvent, Point, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
-import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
+import { findPortByRef, getNodePorts, headerShift, layoutNodePorts } from '../model/query';
 import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
 import { connectionIssues, planConnectionColors } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
@@ -555,6 +555,7 @@ export class DiagramView {
         // 画像のある機器は、小さなアイコンの代わりに画像を出す(画像が壊れている・無いときは、アイコンのまま)
         const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
         const image = isImageDataUri(imageUri) ? imageUri : undefined;
+        const shift = headerShift(doc, n); // 上辺の番号を出すときは、名前とアイコンを下へずらす
         const countText = n.count ? ` ${t('node.count', { count: n.count })}` : '';
         const modelLine = n.model || countText ? `<br><span style="font-size:11px;font-weight:normal;color:${th.modelText}">${escapeHtml(n.model)}${escapeHtml(countText)}</span>` : '';
         const nodeCell = g.insertVertex({
@@ -578,7 +579,7 @@ export class DiagramView {
             verticalAlign: 'top',
             align: 'left',
             spacingLeft: image ? 14 : th.iconSize + 14,
-            spacingTop: 6,
+            spacingTop: 6 + shift,
           },
         });
         nodeCell.setConnectable(false);
@@ -598,7 +599,7 @@ export class DiagramView {
           const icon = g.insertVertex({
             parent: nodeCell,
             id: `i:${n.id}`,
-            position: [8, 8],
+            position: [8, 8 + shift],
             size: [th.iconSize, th.iconSize],
             style: { shape: 'image', image: iconDataUri(kind, th.nodeStroke) },
           });

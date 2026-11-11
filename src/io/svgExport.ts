@@ -1,5 +1,5 @@
 import { imageBox, isImageDataUri } from '../model/images';
-import { getNodePorts, layoutNodePorts } from '../model/query';
+import { getNodePorts, headerShift, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
 import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
@@ -119,6 +119,7 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
   const image = isImageDataUri(imageUri) ? imageUri : undefined;
   const textInset = image ? 14 : th.iconSize + 14; // 画像があるときは、小さなアイコンを出さない
   const textX = n.x + textInset;
+  const shift = headerShift(doc, n); // 上辺の番号を出すときは、名前とアイコンを下へずらす(画面と同じ)
   const countText = n.count ? ` ${opts.countText(n.count)}` : '';
   const modelLine = `${n.model}${countText}`.trim();
   // 画面と同じく、名称・型番は枠の幅で折り返す(画面と同じく、右端の余白はわずか)
@@ -139,13 +140,13 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
           const box = imageBox(n);
           return `<image x="${num(n.x + box.x)}" y="${num(n.y + box.y)}" width="${num(box.w)}" height="${num(box.h)}" preserveAspectRatio="xMidYMid meet" href="${image}"/>`;
         })()
-      : iconSvgGroup(kind, th.nodeStroke, n.x + 8, n.y + 8, th.iconSize),
+      : iconSvgGroup(kind, th.nodeStroke, n.x + 8, n.y + 8 + shift, th.iconSize),
     `<g clip-path="url(#${clipId})">`,
     ...labelLines.map(
-      (line, i) => `<text x="${num(textX)}" y="${num(n.y + 18 + i * 14)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(line)}</text>`,
+      (line, i) => `<text x="${num(textX)}" y="${num(n.y + 18 + shift + i * 14)}" font-size="12" font-weight="bold" fill="${th.nodeText}">${esc(line)}</text>`,
     ),
     ...modelLines.map(
-      (line, i) => `<text x="${num(textX)}" y="${num(n.y + 18 + labelLines.length * 14 + 1 + i * 13)}" font-size="11" fill="${th.modelText}">${esc(line)}</text>`,
+      (line, i) => `<text x="${num(textX)}" y="${num(n.y + 18 + shift + labelLines.length * 14 + 1 + i * 13)}" font-size="11" fill="${th.modelText}">${esc(line)}</text>`,
     ),
     '</g>',
   ];
