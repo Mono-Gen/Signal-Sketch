@@ -182,9 +182,13 @@ With nothing selected, the right panel edits the signal types.
 
 - You can rename, recolor, reorder, add and delete types. A color change updates lines, ports and the legend at once.
 - You can choose a **line style** (solid, dashed, dotted) for each signal. It helps people who find colors hard to tell apart, and black-and-white printing (for example, solid for LAN and dashed for the rest). The legend swatch and the SVG / PNG exports show the same style. Lines **with an issue** (direction or signal mismatch) are still shown dashed or dotted as before, whatever the signal's style.
-- A type in use cannot be deleted (whether ports use it or a device type definition refers to it).
+- Click the color swatch to choose a color (the browser's color picker; to enter a color code, press the `⇅` in that picker to switch to HEX).
+- **Sub-signals**: "Add sub" creates a sub-signal under a type (two levels at most). For example, "Control LAN" and "Dante" under LAN. A sub-signal starts with a color derived from its parent's, which you can change freely. In the port's signal list, sub-signals are indented under their parent.
+- **Connections within the same family** (a parent and its sub-signal, or two sub-signals of the same parent) do not raise a signal-mismatch issue. A switch port can stay plain "LAN" and connect to devices that use a sub-signal such as a control LAN. Different families (for example LAN and HDMI) still raise an issue.
+- When connected, the line and both ports take the color of the side that has the sub-signal (if both are sub-signals, the side where the line was started).
+- A type that is not used can be deleted right away. For a type in use (ports use it, or a device type definition refers to it), the names of the devices and types are shown and you can **reassign it to another type and delete it**. A parent that has sub-signals can be deleted after its sub-signals are deleted.
 - Renaming keeps the internal ID, so connections are not broken.
-- The defaults are five types: LAN, CONTROL, HDMI, USB and AUDIO.
+- The defaults for a new diagram are six types: LAN, CONTROL, HDMI, USB, AUDIO and SERIAL (RS-232C and the like). SERIAL is not added to existing diagrams.
 
 ## 9. Saving, opening and exporting
 

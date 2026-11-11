@@ -8,18 +8,18 @@ Place devices, define their ports, and connect ports with the mouse. Lines are r
 
 ## Features
 
-- Devices with port groups (signal type, direction, side, count); ports can be moved one by one
+- Devices with port groups (signal type, direction, side, count, start number); ports can be moved one by one, and port numbers can be shown on the diagram
 - Port-to-port connections with automatic orthogonal routing, colored by signal type
 - Issue list for suspicious connections (different signal types, input-to-input / output-to-output)
 - Grouping frames (e.g. Rack, Table) whose membership follows position
-- Editable legend (signal types)
+- Editable legend (signal types), with sub-signals (e.g. control LAN under LAN); connections within one signal family raise no mismatch issue
 - Adjustable page size (16:9 presets or custom) and zoom
 - Devices with a quantity show one set of ports per unit
 - Box-select several devices to delete, copy, move, align or space them evenly; Shift+drop a device from the palette to add several in a row
 - Connect many ports at once (box-select ports, drag them onto a destination; it continues into the other devices of the same frame)
 - Right-click menu, copy / paste / duplicate, light / dark / automatic color theme
 - Text-only notes on the diagram, with any text color and size
-- Export: JSON (save/open), SVG and PNG (text kept as real text, so it pastes into PowerPoint; device images are included, but whether PowerPoint shows images inside an SVG has not been verified, so PNG is the safe choice for them), CSV device list
+- Export: JSON (save/open), SVG and PNG (follow the current light/dark theme; text kept as real text, so it pastes into PowerPoint; device images are included, but whether PowerPoint shows images inside an SVG has not been verified, so PNG is the safe choice for them), CSV device list
 - Import a device list (CSV) to create a first draft of devices and frames (no connections); the header row must match the exported CSV exactly. Details in the user guide; a sample is in [docs/sample_devices.csv](docs/sample_devices.csv)
 - Set your own images on devices (PNG / JPEG / WebP, stored inside the diagram file) and change device sizes
 - Register a placed device (name, ports, image and size) in the diagram and reuse it from the palette
