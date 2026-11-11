@@ -1,7 +1,7 @@
 import { isDirectionMismatch } from './ports';
 import type { Port } from './ports';
-import { getNodePorts } from './query';
-import type { DiagramDocument, SignalType } from './types';
+import { findPortByRef, getNodePorts } from './query';
+import type { DiagramDocument, DiagramEdge, SignalType } from './types';
 
 export function rootSignalId(signals: readonly SignalType[], id: string): string {
   return signals.find((s) => s.id === id)?.parent ?? id;
@@ -61,4 +61,56 @@ export function diagnose(doc: DiagramDocument): Diagnostic[] {
     }
   }
   return [...errors, ...warnings];
+}
+
+/** 接続の見た目(線の色・線種と、両端のポートの色)を決める信号 */
+export interface ConnectionLook {
+  /** 線の信号 */
+  line: string;
+  /** 両端のポートを塗る信号。系統が違う接続は、ポートを自分の信号のままにする(警告が見えなくならないよう)ので null */
+  ports: string | null;
+}
+
+/**
+ * 同じ系統(ルートが同じ)の接続は、サブ信号のある側の色に線と両端のポートをそろえる
+ * (どちらもサブなら、線を引き始めた側)。系統が違う接続は、引き始めた側の色の線のまま、ポートは自分の色。
+ * 引く向きで色が変わらないよう、同じ信号どうしでは今までと同じ結果になる。
+ */
+export function connectionLook(signals: readonly SignalType[], fromId: string, toId: string): ConnectionLook {
+  if (rootSignalId(signals, fromId) !== rootSignalId(signals, toId)) return { line: fromId, ports: null };
+  const hasParent = (id: string): boolean => signals.find((s) => s.id === id)?.parent !== undefined;
+  const line = hasParent(fromId) || !hasParent(toId) ? fromId : toId;
+  return { line, ports: line };
+}
+
+/**
+ * ページの全接続について、線の信号と、接続済みポートを塗る信号を求める(画面と画像の書き出しで共通)。
+ * 1つのポートに複数の線があって塗る信号が食い違うときは、ポートは自分の信号のままにする。
+ */
+export function planConnectionColors(
+  doc: DiagramDocument,
+  edges: readonly DiagramEdge[],
+): { lineSignal: Map<string, string>; portSignal: Map<string, string> } {
+  const lineSignal = new Map<string, string>();
+  const wanted = new Map<string, Set<string | null>>();
+  const note = (key: string, id: string | null): void => {
+    const set = wanted.get(key) ?? new Set<string | null>();
+    set.add(id);
+    wanted.set(key, set);
+  };
+  for (const e of edges) {
+    const from = findPortByRef(doc, e.from);
+    const to = findPortByRef(doc, e.to);
+    if (!from || !to) continue;
+    const look = connectionLook(doc.signalTypes, from.signalType, to.signalType);
+    lineSignal.set(e.id, look.line);
+    note(`${e.from.nodeId}/${e.from.portId}`, look.ports);
+    note(`${e.to.nodeId}/${e.to.portId}`, look.ports);
+  }
+  const portSignal = new Map<string, string>();
+  for (const [key, set] of wanted) {
+    const [only] = set;
+    if (set.size === 1 && only !== null) portSignal.set(key, only);
+  }
+  return { lineSignal, portSignal };
 }

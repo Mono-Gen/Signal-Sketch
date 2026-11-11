@@ -2,7 +2,7 @@ import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph,
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, layoutNodePorts } from '../model/query';
 import { markerSpec } from '../model/portMarker';
-import { connectionIssues } from '../model/diagnostics';
+import { connectionIssues, planConnectionColors } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
 import type { PortRef, Side } from '../model/types';
@@ -465,6 +465,7 @@ export class DiagramView {
     const parent = g.getDefaultParent();
     const th = this.theme;
     const signals = new Map(doc.signalTypes.map((s) => [s.id, s]));
+    const colorPlan = planConnectionColors(doc, page.edges); // 線と接続済みポートの色(サブ信号がある側にそろえる)
     const connected = new Set<string>();
     for (const e of page.edges) {
       connected.add(`${e.from.nodeId}/${e.from.portId}`);
@@ -604,7 +605,8 @@ export class DiagramView {
         for (const pl of placements) {
           const port = ports.find((p) => p.id === pl.portId)!;
           const sig = signals.get(port.signalType);
-          const color = signalColor(th, sig?.color ?? '#888888');
+          const own = signalColor(th, sig?.color ?? '#888888');
+          const color = signalColor(th, signals.get(colorPlan.portSignal.get(`${n.id}/${port.id}`) ?? '')?.color ?? sig?.color ?? '#888888');
           // 個別に動かしたポートは、グループの辺ではなく配置された辺に従う
           const spec = markerSpec(port.direction, pl.side);
           const cellId = `p:${n.id}/${port.id}`;
@@ -619,7 +621,7 @@ export class DiagramView {
               direction: spec.direction,
               // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
               fillColor: isConnected ? color : th.portEmptyFill,
-              strokeColor: color,
+              strokeColor: isConnected ? color : own,
               strokeWidth: 1.4,
             },
           });
@@ -638,7 +640,8 @@ export class DiagramView {
         const toPort = findPortByRef(this.store.doc, e.to);
         const fromSide = this.findSide(e.from);
         const toSide = this.findSide(e.to);
-        const color = signalColor(th, signals.get(fromPort?.signalType ?? '')?.color ?? '#666666');
+        const lineSig = signals.get(colorPlan.lineSignal.get(e.id) ?? fromPort?.signalType ?? '');
+        const color = signalColor(th, lineSig?.color ?? '#666666');
         const edge = g.insertEdge({
           parent,
           id: `e:${e.id}`,
@@ -648,7 +651,7 @@ export class DiagramView {
             strokeColor: color,
             strokeWidth: th.edgeWidth,
             // 信号の線の種類(実線・破線・点線)。指摘のある接続は、次の issueStyle が上書きする
-            ...dashStyle(signals.get(fromPort?.signalType ?? '')),
+            ...dashStyle(lineSig),
             // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
             // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
             ...this.issueStyle(fromPort, toPort, doc.signalTypes),
