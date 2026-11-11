@@ -97,8 +97,15 @@ describe('autoNodeSize(ポート番号を表示するときの高さの下限)',
     expect(withLabels([g('t', 'top', 1), g('b', 'bottom', 8)], 'Model-X').h).toBe(70);
   });
 
-  it('下辺にポートがなければ、番号の行が要らないので、標準のまま', () => {
-    expect(withLabels([g('t', 'top', 2), g('l', 'left', 2)]).h).toBe(size([g('t', 'top', 2), g('l', 'left', 2)]).h);
+  it('下辺と左右にポートがなければ、番号の行が要らないので、標準のまま', () => {
+    expect(withLabels([g('t', 'top', 2)]).h).toBe(size([g('t', 'top', 2)]).h);
+  });
+
+  // 左右のポートは、番号を出すとき、開始位置を1グリッド下げる(アイコンと番号が重ならないように)。上辺にも番号があれば、名前のずれ分もさらに下げる
+  it('左右のポート2つ: 番号なし 30+10+10=50 / 番号あり 40+10+10=60 / 上辺にもあれば 50+10+10=70', () => {
+    expect(size([g('l', 'left', 2)]).h).toBe(50);
+    expect(withLabels([g('l', 'left', 2)]).h).toBe(60);
+    expect(withLabels([g('t', 'top', 1), g('l', 'left', 2)]).h).toBe(70);
   });
 
   it('番号を表示しないときは、これまでと同じ', () => {

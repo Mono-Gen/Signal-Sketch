@@ -102,3 +102,18 @@ describe('layoutPorts(設計書 5.3: 辺に沿って、グリッド間隔で並�
     expect(layoutPorts([], { w: 100, h: 100 }, 10)).toEqual([]);
   });
 });
+
+describe('layoutPorts(headerExtra: 番号を出すときの、左右の開始位置)', () => {
+  const ports = [
+    { id: 'l-1', groupId: 'l', index: 1, label: 'L1', signalType: 'LAN', direction: 'inout', side: 'left', unit: 1, multi: false },
+    { id: 'b-1', groupId: 'b', index: 1, label: 'B1', signalType: 'LAN', direction: 'inout', side: 'bottom', unit: 1, multi: false },
+  ] as const;
+
+  it('左右の開始位置だけが下がり、上下の辺は変わらない', () => {
+    const plain = layoutPorts(ports, { w: 120, h: 80 }, 10, {});
+    const extra = layoutPorts(ports, { w: 120, h: 80 }, 10, {}, 10);
+    expect(plain.find((p) => p.portId === 'l-1')!.y).toBe(30);
+    expect(extra.find((p) => p.portId === 'l-1')!.y).toBe(40);
+    expect(extra.find((p) => p.portId === 'b-1')).toEqual(plain.find((p) => p.portId === 'b-1'));
+  });
+});

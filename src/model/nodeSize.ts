@@ -1,6 +1,6 @@
 import { ceilToGrid } from './grid';
 import { HEADER_HEIGHT } from './portLayout';
-import { BOTTOM_LABEL_ROW, TOP_LABEL_SHIFT } from './portMarker';
+import { BOTTOM_LABEL_ROW, SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
 import type { PortGroup, Side } from './types';
 
 /** 文字幅の概算(全角は広め)。実測せず、レイアウトの下限を決めるためだけに使う */
@@ -60,8 +60,10 @@ export function autoNodeSize(input: SizeInput): { w: number; h: number } {
   const vertical = Math.max(slotsOnSide(groups, 'left', units), slotsOnSide(groups, 'right', units));
   const horizontal = Math.max(slotsOnSide(groups, 'top', units), slotsOnSide(groups, 'bottom', units));
 
-  // 左右の辺: 開始位置(ヘッダ分) + 間隔 x (枠数-1) + 終端の余白(1グリッド)
-  const neededH = vertical > 0 ? ceilToGrid(ceilToGrid(HEADER_HEIGHT, grid) + (vertical - 1) * grid + grid, grid) : 0;
+  // 左右の辺: 開始位置(ヘッダ分。番号を出すときは、さらに下げる) + 間隔 x (枠数-1) + 終端の余白(1グリッド)
+  const hasTopPorts = groups.some((g) => g.side === 'top' && g.count > 0);
+  const headerExtra = input.portLabels ? SIDE_LABEL_EXTRA + (hasTopPorts ? TOP_LABEL_SHIFT : 0) : 0;
+  const neededH = vertical > 0 ? ceilToGrid(ceilToGrid(HEADER_HEIGHT + headerExtra, grid) + (vertical - 1) * grid + grid, grid) : 0;
   // 上下の辺: 両端1グリッドずつの余白 + 間隔 x (枠数-1)
   const neededPortW = horizontal > 0 ? (horizontal + 1) * grid : 0;
   const neededTextW = ceilToGrid(inset + Math.max(estimateTextWidth(label), estimateTextWidth(model)), grid);

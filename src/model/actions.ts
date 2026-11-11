@@ -7,7 +7,7 @@ import { connectionIssues } from './diagnostics';
 import { exceedsPortLimit, expandPortGroups, expandUnits } from './ports';
 import { alongRange } from './portLayout';
 import { isValidPageSize, itemsOutside } from './pageSize';
-import { getNodePorts, getPage, getTemplate, layoutNodePorts } from './query';
+import { getNodePorts, getPage, getTemplate, layoutNodePorts, portHeaderExtra } from './query';
 import { MAX_TEMPLATES } from './templateActions';
 import type { DeviceTemplate, DiagramDocument, DiagramNode, PortGroup, PortRef, Side } from './types';
 
@@ -471,7 +471,7 @@ export function movePort(pageId: string, nodeId: string, portId: string, side: S
     if (!SIDES.includes(side) || !Number.isFinite(pos)) return fail('invalid-value');
 
     const size = { w: node.w, h: node.h };
-    const { min, max } = alongRange(side, size, doc.grid.size);
+    const { min, max } = alongRange(side, size, doc.grid.size, portHeaderExtra(doc, node));
     const along = Math.min(max, Math.max(min, doc.grid.enabled ? snap(pos, doc.grid.size) : pos));
 
     const before = node.portPlacements;

@@ -1,5 +1,5 @@
 import { layoutPorts } from './portLayout';
-import { TOP_LABEL_SHIFT } from './portMarker';
+import { SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
 import type { PortPlacement } from './portLayout';
 import { expandPortGroups, expandUnits, resolvePortGroups } from './ports';
 import type { Port } from './ports';
@@ -27,13 +27,20 @@ export function findPortByRef(doc: DiagramDocument, ref: PortRef): Port | undefi
 
 /** 機器のポートの配置(個別に動かした位置を考慮)。線が出る向きも、ここで決まる辺に従う */
 export function layoutNodePorts(doc: DiagramDocument, node: DiagramNode): PortPlacement[] {
-  return layoutPorts(getNodePorts(doc, node), { w: node.w, h: node.h }, doc.grid.size, node.portPlacements);
+  return layoutPorts(getNodePorts(doc, node), { w: node.w, h: node.h }, doc.grid.size, node.portPlacements, portHeaderExtra(doc, node));
 }
 
-export { TOP_LABEL_SHIFT } from './portMarker';
+export { SIDE_LABEL_EXTRA, TOP_LABEL_SHIFT } from './portMarker';
 
 /** 機器の名前・アイコンを下へずらす量。上辺にポートがあって、番号を表示しているときだけ(他は0) */
 export function headerShift(doc: DiagramDocument, node: DiagramNode): number {
   if (!node.showPortLabels) return 0;
-  return layoutNodePorts(doc, node).some((p) => p.side === 'top') ? TOP_LABEL_SHIFT : 0;
+  // 配置(layoutNodePorts)を使わず、辺だけで判定する: 配置がこの値を使うため、使うと循環する
+  const onTop = getNodePorts(doc, node).some((p) => (node.portPlacements?.[p.id]?.side ?? p.side) === 'top');
+  return onTop ? TOP_LABEL_SHIFT : 0;
+}
+
+/** 左右の辺のポートの開始位置を、番号を出すときに下げる量(アイコン・名前のずれ分も含む) */
+export function portHeaderExtra(doc: DiagramDocument, node: DiagramNode): number {
+  return node.showPortLabels ? SIDE_LABEL_EXTRA + headerShift(doc, node) : 0;
 }
