@@ -5,6 +5,7 @@ import { PORT_LABEL_SIZE } from '../model/portMarker';
 import { connectionIssues } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
+import type { DiagramDocument, Page } from '../model/types';
 import type { PortRef, Side } from '../model/types';
 import type { DocumentStore } from '../state/store';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
@@ -16,6 +17,7 @@ import { iconDataUri } from './icons';
 import { PortInteractions } from './portInteractions';
 import { portTooltipHtml } from './portTooltip';
 import { buildLookContext, edgeLook, portKey, portLook } from './portLook';
+import type { LookContext } from './portLook';
 import { FLAT_THEME } from './theme';
 import type { Theme } from './theme';
 import { anchorScrollDelta, clampZoom } from './zoom';
@@ -468,13 +470,12 @@ export class DiagramView {
     this.callbacks.onSelectionChange();
   }
 
+  /** モデルの現在の状態で、maxGraph のセルを作り直す。重なり順と、ポートの接続先の受け渡しが順序に依存するため、呼ぶ順を変えない */
   private draw(): void {
     const doc = this.store.doc;
     const page = doc.pages[0];
     const g = this.graph;
-    const parent = g.getDefaultParent();
-    const th = this.theme;
-    const look = buildLookContext(doc, page.edges, th); // 線と接続済みポートの色の決定。画像の書き出しと共有する
+    const look = buildLookContext(doc, page.edges, this.theme); // 線と接続済みポートの色の決定。画像の書き出しと共有する
 
     this.applySize(); // ページの大きさが変わった場合に追随する
     g.setGridEnabled(doc.grid.enabled);
@@ -482,7 +483,7 @@ export class DiagramView {
 
     const decorations: Cell[] = [];
     g.batchUpdate(() => {
-      g.removeCells(g.getChildCells(parent, true, true), true);
+      g.removeCells(g.getChildCells(g.getDefaultParent(), true, true), true);
       this.portInfo.clear();
       this.nodeByCell.clear();
       this.edgeByCell.clear();
@@ -490,215 +491,258 @@ export class DiagramView {
       this.noteByCell.clear();
       this.portLabels.clear();
 
-      const groupCells: Cell[] = [];
-      for (const grp of page.groups) {
-        const cell = g.insertVertex({
-          parent,
-          id: `g:${grp.id}`,
-          value: escapeHtml(grp.label),
-          position: [grp.x, grp.y],
-          size: [grp.w, grp.h],
-          style: {
-            shape: 'rectangle',
-            rounded: true,
-            absoluteArcSize: true,
-            arcSize: 14,
-            dashed: true,
-            fillColor: 'none',
-            strokeColor: th.groupStroke,
-            fontColor: th.groupStroke,
-            fontStyle: 1,
-            verticalAlign: 'top',
-            align: 'left',
-            spacingLeft: 14,
-            spacingTop: 4,
-          },
-        });
-        cell.setConnectable(false);
-        this.frameByCell.set(`g:${grp.id}`, grp.id);
-        groupCells.push(cell);
-      }
-
-      // メモ: 文字だけ(枠も背景もない)。つかめる範囲は、透明な塗りで確保する(塗りが無いと、文字のない所を押しても選べない)
-      for (const note of page.notes ?? []) {
-        const cell = g.insertVertex({
-          parent,
-          id: `t:${note.id}`,
-          value: escapeHtml(note.text).replace(/\n/g, '<br>'),
-          position: [note.x, note.y],
-          size: [note.w, note.h],
-          style: {
-            shape: 'rectangle',
-            fillColor: '#ffffff',
-            fillOpacity: 0,
-            strokeColor: 'none',
-            fontColor: note.color ?? th.nodeText,
-            fontSize: note.fontSize ?? DEFAULT_NOTE_FONT,
-            whiteSpace: 'wrap',
-            overflow: 'hidden',
-            align: 'left',
-            verticalAlign: 'top',
-            spacingLeft: 2,
-            spacingTop: 2,
-          },
-        });
-        cell.setConnectable(false);
-        this.noteByCell.set(`t:${note.id}`, note.id);
-      }
-
-      const portCells = new Map<string, Cell>();
-      for (const n of page.nodes) {
-        const tpl = doc.deviceTemplates.find((x) => x.id === n.templateId);
-        const kind = tpl?.kind ?? 'generic';
-        const shape = tpl?.shape ?? 'roundRect';
-        // 画像のある機器は、小さなアイコンの代わりに画像を出す(画像が壊れている・無いときは、アイコンのまま)
-        const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
-        const image = isImageDataUri(imageUri) ? imageUri : undefined;
-        const shift = headerShift(doc, n); // 上辺の番号を出すときは、名前とアイコンを下へずらす
-        const countText = n.count ? ` ${t('node.count', { count: n.count })}` : '';
-        const modelLine = n.model || countText ? `<br><span style="font-size:11px;font-weight:normal;color:${th.modelText}">${escapeHtml(n.model)}${escapeHtml(countText)}</span>` : '';
-        const nodeCell = g.insertVertex({
-          parent,
-          id: `n:${n.id}`,
-          value: `<b>${escapeHtml(n.label)}</b>${modelLine}`,
-          position: [n.x, n.y],
-          size: [n.w, n.h],
-          style: {
-            shape: shape === 'ellipse' ? 'ellipse' : 'rectangle',
-            rounded: shape === 'roundRect',
-            absoluteArcSize: true,
-            arcSize: 6,
-            fillColor: th.nodeFill,
-            strokeColor: th.nodeStroke,
-            strokeWidth: th.nodeStrokeWidth,
-            fontColor: th.nodeText,
-            fontSize: 12,
-            whiteSpace: 'wrap',
-            overflow: 'hidden',
-            verticalAlign: 'top',
-            align: 'left',
-            spacingLeft: image ? 14 : th.iconSize + 14,
-            spacingTop: 6 + shift,
-          },
-        });
-        nodeCell.setConnectable(false);
-        this.nodeByCell.set(`n:${n.id}`, n.id);
-
-        if (image) {
-          const box = imageBox(n);
-          const pic = g.insertVertex({
-            parent: nodeCell,
-            id: `i:${n.id}`,
-            position: [box.x, box.y],
-            size: [box.w, box.h],
-            style: { shape: 'image', image, imageAspect: true },
-          });
-          pic.setConnectable(false);
-        } else {
-          const icon = g.insertVertex({
-            parent: nodeCell,
-            id: `i:${n.id}`,
-            position: [8, 8 + shift],
-            size: [th.iconSize, th.iconSize],
-            style: { shape: 'image', image: iconDataUri(kind, th.nodeStroke) },
-          });
-          icon.setConnectable(false);
-        }
-
-        const ports = getNodePorts(doc, n);
-        const placements = layoutNodePorts(doc, n);
-        for (const pl of placements) {
-          const port = ports.find((p) => p.id === pl.portId)!;
-          const sig = look.signals.get(port.signalType);
-          const pk = portLook(look, n, pl, port); // 個別に動かしたポートは、グループの辺ではなく配置された辺に従う
-          const cellId = `p:${n.id}/${port.id}`;
-          const markerShape = pk.marker.shape === 'square' ? 'rectangle' : pk.marker.shape;
-          const half = pk.marker.size / 2;
-          if (pk.outline) {
-            const o = pk.outline.size;
-            const outline = g.insertVertex({
-              parent: nodeCell,
-              position: [pk.marker.cx - o / 2, pk.marker.cy - o / 2],
-              size: [o, o],
-              style: { shape: markerShape, direction: pk.marker.direction, fillColor: 'none', strokeColor: pk.outline.stroke, strokeWidth: 1, pointerEvents: false },
-            });
-            outline.setConnectable(false);
-            this.portDecorations.add(outline);
-            decorations.push(outline);
-          }
-          if (pk.label) {
-            const width = Math.max(PORT_LABEL_SIZE, Array.from(pk.label.text).length * PORT_LABEL_SIZE);
-            const x = pk.label.align === 'left' ? pk.label.x : pk.label.align === 'right' ? pk.label.x - width : pk.label.x - width / 2;
-            const label = g.insertVertex({
-              parent: nodeCell, value: escapeHtml(pk.label.text), position: [x, pk.label.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
-              style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pk.label.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
-            });
-            label.setConnectable(false);
-            this.portDecorations.add(label);
-            decorations.push(label);
-          }
-          // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
-          const cell = g.insertVertex({
-            parent: nodeCell,
-            id: cellId,
-            position: [pk.marker.cx - half, pk.marker.cy - half],
-            size: [pk.marker.size, pk.marker.size],
-            style: {
-              shape: markerShape,
-              direction: pk.marker.direction,
-              fillColor: pk.fill,
-              strokeColor: pk.stroke,
-              strokeWidth: 1.4,
-            },
-          });
-          this.portInfo.set(cellId, { nodeId: n.id, portId: port.id });
-          this.portLabels.set(cellId, portTooltipHtml(port, sig?.label, Boolean(n.count && n.count > 1)));
-          portCells.set(portKey(n.id, port.id), cell);
-        }
-      }
-
-      const edgeCells: Cell[] = [];
-      for (const e of page.edges) {
-        const a = portCells.get(portKey(e.from.nodeId, e.from.portId));
-        const b = portCells.get(portKey(e.to.nodeId, e.to.portId));
-        if (!a || !b) continue; // 検証済みのドキュメントでは起きない。壊れた参照は描かない
-        const fromPort = findPortByRef(this.store.doc, e.from);
-        const toPort = findPortByRef(this.store.doc, e.to);
-        const fromSide = this.findSide(e.from);
-        const toSide = this.findSide(e.to);
-        const line = edgeLook(look, e.id, fromPort);
-        const edge = g.insertEdge({
-          parent,
-          id: `e:${e.id}`,
-          source: a,
-          target: b,
-          style: {
-            strokeColor: line.color,
-            strokeWidth: th.edgeWidth,
-            // 信号の線の種類(実線・破線・点線)。指摘のある接続は、次の issueStyle が上書きする
-            ...dashStyle(line.signal),
-            // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
-            // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
-            ...this.issueStyle(fromPort, toPort, doc.signalTypes),
-            sourcePortConstraint: fromSide ? SIDE_TO_CONSTRAINT[fromSide] : undefined,
-            targetPortConstraint: toSide ? SIDE_TO_CONSTRAINT[toSide] : undefined,
-          },
-        });
-        // 手で引き直した経路があれば、それを通る(自動配線の中継点として渡す)
-        const geometry = edge.getGeometry();
-        if (geometry && e.waypoints && e.waypoints.length > 0) geometry.points = e.waypoints.map((p) => new Point(p.x, p.y));
-        this.edgeByCell.set(`e:${e.id}`, e.id);
-        edgeCells.push(edge);
-      }
-
-      // 重なり順は「グループ枠 < 線 < 機器とポート」にする(実ブラウザの検証で判明した2点)。
-      // ・線が機器の上にあると、ポートへマウスを合わせたときに線に当たり、接続先にできない。
-      // ・グループ枠(塗りなし)が線の上にあると、枠の内側にある線をクリックしても選択できない。
-      // 機器の側を前面へ動かす方法は、子のポートの描画順が追従せず、機器本体が
-      // ポートの上に来てしまうため使わない。線→枠の順に最背面へ送り、枠を一番奥にする。
-      g.orderCells(true, edgeCells);
-      g.orderCells(true, groupCells);
+      const groupCells = this.drawFrames(page);
+      this.drawNotes(page);
+      const portCells = this.drawNodes(doc, page, look, decorations);
+      const edgeCells = this.drawEdges(doc, page, look, portCells);
+      this.applyZOrder(edgeCells, groupCells);
     });
+    // 描画状態を取れるのは、更新を終えたあと
+    this.markDecorations(decorations);
+  }
+
+  /** グループの枠(点線の枠と名前)。作ったセルを返す */
+  private drawFrames(page: Page): Cell[] {
+    const g = this.graph;
+    const parent = g.getDefaultParent();
+    const th = this.theme;
+    const groupCells: Cell[] = [];
+    for (const grp of page.groups) {
+      const cell = g.insertVertex({
+        parent,
+        id: `g:${grp.id}`,
+        value: escapeHtml(grp.label),
+        position: [grp.x, grp.y],
+        size: [grp.w, grp.h],
+        style: {
+          shape: 'rectangle',
+          rounded: true,
+          absoluteArcSize: true,
+          arcSize: 14,
+          dashed: true,
+          fillColor: 'none',
+          strokeColor: th.groupStroke,
+          fontColor: th.groupStroke,
+          fontStyle: 1,
+          verticalAlign: 'top',
+          align: 'left',
+          spacingLeft: 14,
+          spacingTop: 4,
+        },
+      });
+      cell.setConnectable(false);
+      this.frameByCell.set(`g:${grp.id}`, grp.id);
+      groupCells.push(cell);
+    }
+    return groupCells;
+  }
+
+  /** メモ(文字だけ) */
+  private drawNotes(page: Page): void {
+    const g = this.graph;
+    const parent = g.getDefaultParent();
+    const th = this.theme;
+    // メモ: 文字だけ(枠も背景もない)。つかめる範囲は、透明な塗りで確保する(塗りが無いと、文字のない所を押しても選べない)
+    for (const note of page.notes ?? []) {
+      const cell = g.insertVertex({
+        parent,
+        id: `t:${note.id}`,
+        value: escapeHtml(note.text).replace(/\n/g, '<br>'),
+        position: [note.x, note.y],
+        size: [note.w, note.h],
+        style: {
+          shape: 'rectangle',
+          fillColor: '#ffffff',
+          fillOpacity: 0,
+          strokeColor: 'none',
+          fontColor: note.color ?? th.nodeText,
+          fontSize: note.fontSize ?? DEFAULT_NOTE_FONT,
+          whiteSpace: 'wrap',
+          overflow: 'hidden',
+          align: 'left',
+          verticalAlign: 'top',
+          spacingLeft: 2,
+          spacingTop: 2,
+        },
+      });
+      cell.setConnectable(false);
+      this.noteByCell.set(`t:${note.id}`, note.id);
+    }
+  }
+
+  /** 機器・アイコン(画像)・ポート・外枠・番号。ポートのセルを `nodeId/portId` で返す(線の接続先に使う) */
+  private drawNodes(doc: DiagramDocument, page: Page, look: LookContext, decorations: Cell[]): Map<string, Cell> {
+    const g = this.graph;
+    const parent = g.getDefaultParent();
+    const th = this.theme;
+    const portCells = new Map<string, Cell>();
+    for (const n of page.nodes) {
+      const tpl = doc.deviceTemplates.find((x) => x.id === n.templateId);
+      const kind = tpl?.kind ?? 'generic';
+      const shape = tpl?.shape ?? 'roundRect';
+      // 画像のある機器は、小さなアイコンの代わりに画像を出す(画像が壊れている・無いときは、アイコンのまま)
+      const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
+      const image = isImageDataUri(imageUri) ? imageUri : undefined;
+      const shift = headerShift(doc, n); // 上辺の番号を出すときは、名前とアイコンを下へずらす
+      const countText = n.count ? ` ${t('node.count', { count: n.count })}` : '';
+      const modelLine = n.model || countText ? `<br><span style="font-size:11px;font-weight:normal;color:${th.modelText}">${escapeHtml(n.model)}${escapeHtml(countText)}</span>` : '';
+      const nodeCell = g.insertVertex({
+        parent,
+        id: `n:${n.id}`,
+        value: `<b>${escapeHtml(n.label)}</b>${modelLine}`,
+        position: [n.x, n.y],
+        size: [n.w, n.h],
+        style: {
+          shape: shape === 'ellipse' ? 'ellipse' : 'rectangle',
+          rounded: shape === 'roundRect',
+          absoluteArcSize: true,
+          arcSize: 6,
+          fillColor: th.nodeFill,
+          strokeColor: th.nodeStroke,
+          strokeWidth: th.nodeStrokeWidth,
+          fontColor: th.nodeText,
+          fontSize: 12,
+          whiteSpace: 'wrap',
+          overflow: 'hidden',
+          verticalAlign: 'top',
+          align: 'left',
+          spacingLeft: image ? 14 : th.iconSize + 14,
+          spacingTop: 6 + shift,
+        },
+      });
+      nodeCell.setConnectable(false);
+      this.nodeByCell.set(`n:${n.id}`, n.id);
+
+      if (image) {
+        const box = imageBox(n);
+        const pic = g.insertVertex({
+          parent: nodeCell,
+          id: `i:${n.id}`,
+          position: [box.x, box.y],
+          size: [box.w, box.h],
+          style: { shape: 'image', image, imageAspect: true },
+        });
+        pic.setConnectable(false);
+      } else {
+        const icon = g.insertVertex({
+          parent: nodeCell,
+          id: `i:${n.id}`,
+          position: [8, 8 + shift],
+          size: [th.iconSize, th.iconSize],
+          style: { shape: 'image', image: iconDataUri(kind, th.nodeStroke) },
+        });
+        icon.setConnectable(false);
+      }
+
+      const ports = getNodePorts(doc, n);
+      const placements = layoutNodePorts(doc, n);
+      for (const pl of placements) {
+        const port = ports.find((p) => p.id === pl.portId)!;
+        const sig = look.signals.get(port.signalType);
+        const pk = portLook(look, n, pl, port); // 個別に動かしたポートは、グループの辺ではなく配置された辺に従う
+        const cellId = `p:${n.id}/${port.id}`;
+        const markerShape = pk.marker.shape === 'square' ? 'rectangle' : pk.marker.shape;
+        const half = pk.marker.size / 2;
+        if (pk.outline) {
+          const o = pk.outline.size;
+          const outline = g.insertVertex({
+            parent: nodeCell,
+            position: [pk.marker.cx - o / 2, pk.marker.cy - o / 2],
+            size: [o, o],
+            style: { shape: markerShape, direction: pk.marker.direction, fillColor: 'none', strokeColor: pk.outline.stroke, strokeWidth: 1, pointerEvents: false },
+          });
+          outline.setConnectable(false);
+          this.portDecorations.add(outline);
+          decorations.push(outline);
+        }
+        if (pk.label) {
+          const width = Math.max(PORT_LABEL_SIZE, Array.from(pk.label.text).length * PORT_LABEL_SIZE);
+          const x = pk.label.align === 'left' ? pk.label.x : pk.label.align === 'right' ? pk.label.x - width : pk.label.x - width / 2;
+          const label = g.insertVertex({
+            parent: nodeCell, value: escapeHtml(pk.label.text), position: [x, pk.label.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
+            style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pk.label.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
+          });
+          label.setConnectable(false);
+          this.portDecorations.add(label);
+          decorations.push(label);
+        }
+        // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
+        const cell = g.insertVertex({
+          parent: nodeCell,
+          id: cellId,
+          position: [pk.marker.cx - half, pk.marker.cy - half],
+          size: [pk.marker.size, pk.marker.size],
+          style: {
+            shape: markerShape,
+            direction: pk.marker.direction,
+            fillColor: pk.fill,
+            strokeColor: pk.stroke,
+            strokeWidth: 1.4,
+          },
+        });
+        this.portInfo.set(cellId, { nodeId: n.id, portId: port.id });
+        this.portLabels.set(cellId, portTooltipHtml(port, sig?.label, Boolean(n.count && n.count > 1)));
+        portCells.set(portKey(n.id, port.id), cell);
+      }
+    }
+    return portCells;
+  }
+
+  /** 接続の線 */
+  private drawEdges(doc: DiagramDocument, page: Page, look: LookContext, portCells: ReadonlyMap<string, Cell>): Cell[] {
+    const g = this.graph;
+    const parent = g.getDefaultParent();
+    const th = this.theme;
+    const edgeCells: Cell[] = [];
+    for (const e of page.edges) {
+      const a = portCells.get(portKey(e.from.nodeId, e.from.portId));
+      const b = portCells.get(portKey(e.to.nodeId, e.to.portId));
+      if (!a || !b) continue; // 検証済みのドキュメントでは起きない。壊れた参照は描かない
+      const fromPort = findPortByRef(this.store.doc, e.from);
+      const toPort = findPortByRef(this.store.doc, e.to);
+      const fromSide = this.findSide(e.from);
+      const toSide = this.findSide(e.to);
+      const line = edgeLook(look, e.id, fromPort);
+      const edge = g.insertEdge({
+        parent,
+        id: `e:${e.id}`,
+        source: a,
+        target: b,
+        style: {
+          strokeColor: line.color,
+          strokeWidth: th.edgeWidth,
+          // 信号の線の種類(実線・破線・点線)。指摘のある接続は、次の issueStyle が上書きする
+          ...dashStyle(line.signal),
+          // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
+          // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
+          ...this.issueStyle(fromPort, toPort, doc.signalTypes),
+          sourcePortConstraint: fromSide ? SIDE_TO_CONSTRAINT[fromSide] : undefined,
+          targetPortConstraint: toSide ? SIDE_TO_CONSTRAINT[toSide] : undefined,
+        },
+      });
+      // 手で引き直した経路があれば、それを通る(自動配線の中継点として渡す)
+      const geometry = edge.getGeometry();
+      if (geometry && e.waypoints && e.waypoints.length > 0) geometry.points = e.waypoints.map((p) => new Point(p.x, p.y));
+      this.edgeByCell.set(`e:${e.id}`, e.id);
+      edgeCells.push(edge);
+    }
+    return edgeCells;
+  }
+
+  private applyZOrder(edgeCells: Cell[], groupCells: Cell[]): void {
+    const g = this.graph;
+    // 重なり順は「グループ枠 < 線 < 機器とポート」にする(実ブラウザの検証で判明した2点)。
+    // ・線が機器の上にあると、ポートへマウスを合わせたときに線に当たり、接続先にできない。
+    // ・グループ枠(塗りなし)が線の上にあると、枠の内側にある線をクリックしても選択できない。
+    // 機器の側を前面へ動かす方法は、子のポートの描画順が追従せず、機器本体が
+    // ポートの上に来てしまうため使わない。線→枠の順に最背面へ送り、枠を一番奥にする。
+    g.orderCells(true, edgeCells);
+    g.orderCells(true, groupCells);
+  }
+
+  /** 輪郭・番号に「当たり判定を持たない」印(CSS)を付ける */
+  private markDecorations(decorations: readonly Cell[]): void {
+    const g = this.graph;
     for (const cell of decorations) {
       const state = g.getView().getState(cell);
       // 親だけを none にしても、子の要素(輪郭の見えない当たり判定・文字)の pointer-events 属性が残り、隣のポートの操作を奪う。
