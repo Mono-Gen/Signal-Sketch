@@ -108,18 +108,6 @@ export function reassignAndRemoveSignalType(id: string, toId: string): Action {
   };
 }
 
-export function setSignalParent(id: string, parentId: string | null): Action {
-  return (doc) => {
-    const signal = doc.signalTypes.find((s) => s.id === id);
-    if (!signal) return fail('unknown-signal');
-    if (parentId === null) { delete signal.parent; return OK; }
-    const parent = doc.signalTypes.find((s) => s.id === parentId);
-    if (!parent || parent.id === id || parent.parent !== undefined || doc.signalTypes.some((s) => s.parent === id)) return fail('invalid-value');
-    signal.parent = parentId;
-    return OK;
-  };
-}
-
 export function childShade(color: string, index: number): string {
   const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255);
   const max = Math.max(...rgb), min = Math.min(...rgb), light = (max + min) / 2;
@@ -144,15 +132,4 @@ export function availableChildShade(signals: readonly SignalType[], parentId: st
     if (!used.has(shade)) return shade;
   }
   return undefined;
-}
-
-export function recreateSignalColor(id: string): Action {
-  return (doc) => {
-    const signal = doc.signalTypes.find((s) => s.id === id);
-    if (!signal) return fail('unknown-signal');
-    const color = signal.parent && availableChildShade(doc.signalTypes, signal.parent, id);
-    if (!color) return fail('invalid-value');
-    signal.color = color;
-    return OK;
-  };
 }

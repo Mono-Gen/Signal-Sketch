@@ -5,7 +5,7 @@ import { copySelection, pasteClipboard } from '../../src/model/clipboard';
 import { createEmptyDocument } from '../../src/model/defaults';
 import { connectionIssues } from '../../src/model/diagnostics';
 import { PRESETS, presetToTemplate } from '../../src/model/presets';
-import { addSignalType, moveSignalType, orderedSignalTypes, recreateSignalColor, removeSignalType, reassignAndRemoveSignalType, setSignalParent, signalUsageDetails, updateSignalType } from '../../src/model/signalActions';
+import { addSignalType, moveSignalType, orderedSignalTypes, removeSignalType, reassignAndRemoveSignalType, signalUsageDetails, updateSignalType } from '../../src/model/signalActions';
 import { validateDocument } from '../../src/model/validate';
 import { parseDocument, serializeDocument } from '../../src/io/fileIo';
 import { DocumentStore } from '../../src/state/store';
@@ -43,10 +43,6 @@ describe('signal hierarchy', () => {
     const color = first.color;
     updateSignalType('LAN', { color: '#000000' })(doc);
     expect(first.color).toBe(color);
-    expect(setSignalParent('LAN', 'CONTROL')(doc).error).toBe('invalid-value');
-    expect(setSignalParent(a, b)(doc).error).toBe('invalid-value');
-    expect(setSignalParent(a, a)(doc).error).toBe('invalid-value');
-    expect(setSignalParent(a, null)(doc).ok).toBe(true);
     expect(first.color).toBe(color);
   });
 
@@ -136,20 +132,6 @@ describe('hierarchy regression cases', () => {
     expect(order()).toEqual(['r1', 'b', 'a', 'r2', 'c']);
     moveSignalType('r2', -1)(doc);
     expect(order()).toEqual(['r2', 'c', 'r1', 'b', 'a']);
-  });
-
-  it('recreates child color without matching another sibling', () => {
-    const doc = createEmptyDocument();
-    const a = addSignalType('a', '#123456', 'LAN')(doc).created!;
-    const b = addSignalType('b', '#123456', 'LAN')(doc).created!;
-    const aSignal = doc.signalTypes.find((s) => s.id === a)!;
-    const bSignal = doc.signalTypes.find((s) => s.id === b)!;
-    aSignal.color = '#ffffff';
-    expect(recreateSignalColor(a)(doc).ok).toBe(true);
-    expect(aSignal.color).not.toBe(bSignal.color);
-    const first = aSignal.color;
-    expect(recreateSignalColor(a)(doc).ok).toBe(true);
-    expect(aSignal.color).toBe(first);
   });
 
   it('remaps conflicting root and child IDs through templates and overrides', () => {
