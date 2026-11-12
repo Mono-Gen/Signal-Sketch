@@ -1,15 +1,16 @@
 import { imageBox, isImageDataUri } from '../model/images';
 import { getNodePorts, headerShift, layoutNodePorts } from '../model/query';
 import { estimateTextWidth } from '../model/nodeSize';
-import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
+import { PORT_LABEL_SIZE } from '../model/portMarker';
 import type { CompassDirection } from '../model/portMarker';
 import { DASH_PATTERN, lineStyleOf } from '../model/lineStyle';
 import { DEFAULT_NOTE_FONT } from '../model/notes';
-import { planConnectionColors } from '../model/diagnostics';
 import { orderedSignalTypes } from '../model/signalActions';
 import type { DiagramDocument, DiagramNode, DiagramNote, SignalType } from '../model/types';
 import { escapeHtml } from '../util/escapeHtml';
 import { iconSvgGroup } from '../view/icons';
+import { buildLookContext, edgeLook, portLook } from '../view/portLook';
+import type { LookContext } from '../view/portLook';
 import { FLAT_THEME, signalColor } from '../view/theme';
 import type { Theme } from '../view/theme';
 
@@ -109,12 +110,11 @@ function markerPoints(shape: 'triangle' | 'square', dir: CompassDirection, cx: n
   return pts.map(([x, y]) => `${num(x)},${num(y)}`).join(' ');
 }
 
-function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected: Set<string>, portSignal: Map<string, string>, opts: SvgExportOptions, th: Theme): string {
+function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, look: LookContext, opts: SvgExportOptions, th: Theme): string {
   const tpl = doc.deviceTemplates.find((t) => t.id === n.templateId);
   const kind = tpl?.kind ?? 'generic';
   const shape = tpl?.shape ?? 'roundRect';
   const clipId = `clip-${index}`;
-  const signals = new Map(doc.signalTypes.map((s) => [s.id, s]));
   const imageUri = n.imageId ? doc.assets?.[n.imageId] : undefined;
   const image = isImageDataUri(imageUri) ? imageUri : undefined;
   const textInset = image ? 14 : th.iconSize + 14; // 画像があるときは、小さなアイコンを出さない
@@ -151,27 +151,22 @@ function nodeSvg(doc: DiagramDocument, n: DiagramNode, index: number, connected:
     '</g>',
   ];
 
+  // 見た目の決定は画面と共有(view/portLook)。座標は機器内の相対座標なので、機器の位置を足して絶対座標にする
   const ports = getNodePorts(doc, n);
-  const markerSize = doc.grid.size * th.markerRatio;
   for (const pl of layoutNodePorts(doc, n)) {
     const port = ports.find((p) => p.id === pl.portId);
     if (!port) continue;
-    const own = signalColor(th, signals.get(port.signalType)?.color ?? '#888888');
-    const isConnected = connected.has(`${n.id}/${port.id}`);
-    // 接続済みのポートは、画面と同じく、つながる線の色にそろえる
-    const color = isConnected ? signalColor(th, signals.get(portSignal.get(`${n.id}/${port.id}`) ?? '')?.color ?? signals.get(port.signalType)?.color ?? '#888888') : own;
-    const spec = markerSpec(port.direction, pl.side);
-    const fill = isConnected ? color : th.portEmptyFill;
-    if (port.multi) {
-      parts.push(`<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize + 2 * MULTI_OUTLINE_GAP)}" fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`);
+    const pk = portLook(look, n, pl, port);
+    const { marker } = pk;
+    if (pk.outline) {
+      parts.push(`<polygon points="${markerPoints(marker.shape, marker.direction, n.x + marker.cx, n.y + marker.cy, pk.outline.size)}" fill="none" stroke="${pk.outline.stroke}" stroke-width="1" stroke-linejoin="round"/>`);
     }
-    if (n.showPortLabels) {
-      const pos = portLabelPosition(pl.side, n.x + pl.x, n.y + pl.y, markerSize);
-      const anchor = pos.align === 'left' ? 'start' : pos.align === 'right' ? 'end' : 'middle';
-      parts.push(`<text x="${num(pos.x)}" y="${num(pos.y)}" text-anchor="${anchor}" dominant-baseline="central" font-size="${PORT_LABEL_SIZE}" fill="${th.nodeText}" pointer-events="none">${esc(portLabelText(port, pl.side))}</text>`);
+    if (pk.label) {
+      const anchor = pk.label.align === 'left' ? 'start' : pk.label.align === 'right' ? 'end' : 'middle';
+      parts.push(`<text x="${num(n.x + pk.label.x)}" y="${num(n.y + pk.label.y)}" text-anchor="${anchor}" dominant-baseline="central" font-size="${PORT_LABEL_SIZE}" fill="${th.nodeText}" pointer-events="none">${esc(pk.label.text)}</text>`);
     }
     parts.push(
-      `<polygon points="${markerPoints(spec.shape, spec.direction, n.x + pl.x, n.y + pl.y, markerSize)}" fill="${fill}" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>`,
+      `<polygon points="${markerPoints(marker.shape, marker.direction, n.x + marker.cx, n.y + marker.cy, marker.size)}" fill="${pk.fill}" stroke="${pk.stroke}" stroke-width="1.4" stroke-linejoin="round"/>`,
     );
   }
   return `<g>${parts.join('')}</g>`;
@@ -249,14 +244,7 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
   const th = opts.theme ?? FLAT_THEME;
   const w = page.size.w;
   const h = page.size.h + LEGEND_HEIGHT;
-  const signals = new Map(doc.signalTypes.map((s) => [s.id, s]));
-
-  const colorPlan = planConnectionColors(doc, page.edges);
-  const connected = new Set<string>();
-  for (const e of page.edges) {
-    connected.add(`${e.from.nodeId}/${e.from.portId}`);
-    connected.add(`${e.to.nodeId}/${e.to.portId}`);
-  }
+  const look = buildLookContext(doc, page.edges, th);
 
   const frames = page.groups.map(
     (g) =>
@@ -270,12 +258,11 @@ export function buildSvg(doc: DiagramDocument, pageId: string, opts: SvgExportOp
     if (!pts || pts.length < 2) continue;
     const fromNode = page.nodes.find((n) => n.id === e.from.nodeId);
     const fromPort = fromNode ? getNodePorts(doc, fromNode).find((p) => p.id === e.from.portId) : undefined;
-    const lineSig = signals.get(colorPlan.lineSignal.get(e.id) ?? fromPort?.signalType ?? '');
-    const color = signalColor(th, lineSig?.color ?? '#666666');
-    edges.push(`<path d="${roundedPath(pts, CORNER_RADIUS)}" fill="none" stroke="${esc(color)}" stroke-width="${th.edgeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr(lineSig)}/>`);
+    const line = edgeLook(look, e.id, fromPort);
+    edges.push(`<path d="${roundedPath(pts, CORNER_RADIUS)}" fill="none" stroke="${esc(line.color)}" stroke-width="${th.edgeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr(line.signal)}/>`);
   }
 
-  const nodes = page.nodes.map((n, i) => nodeSvg(doc, n, i, connected, colorPlan.portSignal, opts, th));
+  const nodes = page.nodes.map((n, i) => nodeSvg(doc, n, i, look, opts, th));
   const notes = (page.notes ?? []).map((n) => noteSvg(n, th));
 
   return [
