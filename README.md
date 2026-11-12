@@ -6,6 +6,16 @@ Place devices, define their ports, and connect ports with the mouse. Lines are r
 
 > Status: working prototype, being evaluated with its first users. The name is provisional.
 
+![Signal-Sketch (light theme)](assets/screenshot-light.png)
+
+<details><summary>Dark theme</summary>
+
+![Signal-Sketch (dark theme)](assets/screenshot-dark.png)
+
+</details>
+
+The diagram shown is the sample in [docs/sample_diagram.json](docs/sample_diagram.json); all device names and model numbers are fictitious.
+
 ## Features
 
 - Devices with port groups (signal type, direction, side, count, start number); ports can be moved one by one, and port numbers can be shown on the diagram
@@ -43,6 +53,7 @@ Samples (all device names and model numbers in them are fictitious):
 |---|---|
 | `src/` | Source code |
 | `tests/` | Unit tests |
+| `assets/` | Screenshots used in this README |
 | `docs/` | User-facing documentation, a sample diagram and a sample device list |
 | `licenses/` | License texts of bundled third-party software |
 | `.github/` | Dependabot configuration |
