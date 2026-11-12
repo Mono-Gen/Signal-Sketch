@@ -1,8 +1,8 @@
 import { Cell, CellState, ConnectionHandler, EventObject, GeometryChange, Graph, InternalEvent, Point, PopupMenuHandler, RubberBandHandler, SelectionCellsHandler, TooltipHandler, VertexHandler, getDefaultPlugins } from '@maxgraph/core';
 import { t } from '../i18n';
 import { findPortByRef, getNodePorts, headerShift, layoutNodePorts } from '../model/query';
-import { markerSpec, MULTI_OUTLINE_GAP, PORT_LABEL_SIZE, portLabelPosition, portLabelText } from '../model/portMarker';
-import { connectionIssues, planConnectionColors } from '../model/diagnostics';
+import { PORT_LABEL_SIZE } from '../model/portMarker';
+import { connectionIssues } from '../model/diagnostics';
 import type { BulkPlan } from '../model/bulkConnect';
 import type { Port } from '../model/ports';
 import type { PortRef, Side } from '../model/types';
@@ -15,7 +15,8 @@ import { imageBox, isImageDataUri } from '../model/images';
 import { iconDataUri } from './icons';
 import { PortInteractions } from './portInteractions';
 import { portTooltipHtml } from './portTooltip';
-import { FLAT_THEME, signalColor } from './theme';
+import { buildLookContext, edgeLook, portKey, portLook } from './portLook';
+import { FLAT_THEME } from './theme';
 import type { Theme } from './theme';
 import { anchorScrollDelta, clampZoom } from './zoom';
 
@@ -473,13 +474,7 @@ export class DiagramView {
     const g = this.graph;
     const parent = g.getDefaultParent();
     const th = this.theme;
-    const signals = new Map(doc.signalTypes.map((s) => [s.id, s]));
-    const colorPlan = planConnectionColors(doc, page.edges); // 線と接続済みポートの色(サブ信号がある側にそろえる)
-    const connected = new Set<string>();
-    for (const e of page.edges) {
-      connected.add(`${e.from.nodeId}/${e.from.portId}`);
-      connected.add(`${e.to.nodeId}/${e.to.portId}`);
-    }
+    const look = buildLookContext(doc, page.edges, th); // 線と接続済みポートの色の決定。画像の書き出しと共有する
 
     this.applySize(); // ページの大きさが変わった場合に追随する
     g.setGridEnabled(doc.grid.enabled);
@@ -551,7 +546,6 @@ export class DiagramView {
         this.noteByCell.set(`t:${note.id}`, note.id);
       }
 
-      const markerSize = doc.grid.size * th.markerRatio;
       const portCells = new Map<string, Cell>();
       for (const n of page.nodes) {
         const tpl = doc.deviceTemplates.find((x) => x.id === n.templateId);
@@ -615,78 +609,74 @@ export class DiagramView {
         const placements = layoutNodePorts(doc, n);
         for (const pl of placements) {
           const port = ports.find((p) => p.id === pl.portId)!;
-          const sig = signals.get(port.signalType);
-          const own = signalColor(th, sig?.color ?? '#888888');
-          const color = signalColor(th, signals.get(colorPlan.portSignal.get(`${n.id}/${port.id}`) ?? '')?.color ?? sig?.color ?? '#888888');
-          // 個別に動かしたポートは、グループの辺ではなく配置された辺に従う
-          const spec = markerSpec(port.direction, pl.side);
+          const sig = look.signals.get(port.signalType);
+          const pk = portLook(look, n, pl, port); // 個別に動かしたポートは、グループの辺ではなく配置された辺に従う
           const cellId = `p:${n.id}/${port.id}`;
-          const isConnected = connected.has(`${n.id}/${port.id}`);
-          if (port.multi) {
+          const markerShape = pk.marker.shape === 'square' ? 'rectangle' : pk.marker.shape;
+          const half = pk.marker.size / 2;
+          if (pk.outline) {
+            const o = pk.outline.size;
             const outline = g.insertVertex({
               parent: nodeCell,
-              position: [pl.x - markerSize / 2 - MULTI_OUTLINE_GAP, pl.y - markerSize / 2 - MULTI_OUTLINE_GAP],
-              size: [markerSize + 2 * MULTI_OUTLINE_GAP, markerSize + 2 * MULTI_OUTLINE_GAP],
-              style: { shape: spec.shape === 'square' ? 'rectangle' : spec.shape, direction: spec.direction, fillColor: 'none', strokeColor: isConnected ? color : own, strokeWidth: 1, pointerEvents: false },
+              position: [pk.marker.cx - o / 2, pk.marker.cy - o / 2],
+              size: [o, o],
+              style: { shape: markerShape, direction: pk.marker.direction, fillColor: 'none', strokeColor: pk.outline.stroke, strokeWidth: 1, pointerEvents: false },
             });
             outline.setConnectable(false);
             this.portDecorations.add(outline);
             decorations.push(outline);
           }
-          if (n.showPortLabels) {
-            const pos = portLabelPosition(pl.side, pl.x, pl.y, markerSize);
-            const text = portLabelText(port, pl.side);
-            const width = Math.max(PORT_LABEL_SIZE, Array.from(text).length * PORT_LABEL_SIZE);
-            const x = pos.align === 'left' ? pos.x : pos.align === 'right' ? pos.x - width : pos.x - width / 2;
+          if (pk.label) {
+            const width = Math.max(PORT_LABEL_SIZE, Array.from(pk.label.text).length * PORT_LABEL_SIZE);
+            const x = pk.label.align === 'left' ? pk.label.x : pk.label.align === 'right' ? pk.label.x - width : pk.label.x - width / 2;
             const label = g.insertVertex({
-              parent: nodeCell, value: escapeHtml(text), position: [x, pos.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
-              style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pos.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
+              parent: nodeCell, value: escapeHtml(pk.label.text), position: [x, pk.label.y - PORT_LABEL_SIZE / 2], size: [width, PORT_LABEL_SIZE],
+              style: { fillColor: 'none', strokeColor: 'none', fontColor: th.nodeText, fontSize: PORT_LABEL_SIZE, align: pk.label.align, verticalAlign: 'middle', spacing: 0, pointerEvents: false },
             });
             label.setConnectable(false);
             this.portDecorations.add(label);
             decorations.push(label);
           }
+          // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
           const cell = g.insertVertex({
             parent: nodeCell,
             id: cellId,
-            position: [pl.x - markerSize / 2, pl.y - markerSize / 2],
-            size: [markerSize, markerSize],
+            position: [pk.marker.cx - half, pk.marker.cy - half],
+            size: [pk.marker.size, pk.marker.size],
             style: {
-              shape: spec.shape === 'square' ? 'rectangle' : spec.shape,
-              direction: spec.direction,
-              // 空きは白抜き、接続済みは信号色で塗りつぶす(設計書 5.3)
-              fillColor: isConnected ? color : th.portEmptyFill,
-              strokeColor: isConnected ? color : own,
+              shape: markerShape,
+              direction: pk.marker.direction,
+              fillColor: pk.fill,
+              strokeColor: pk.stroke,
               strokeWidth: 1.4,
             },
           });
           this.portInfo.set(cellId, { nodeId: n.id, portId: port.id });
           this.portLabels.set(cellId, portTooltipHtml(port, sig?.label, Boolean(n.count && n.count > 1)));
-          portCells.set(`${n.id}/${port.id}`, cell);
+          portCells.set(portKey(n.id, port.id), cell);
         }
       }
 
       const edgeCells: Cell[] = [];
       for (const e of page.edges) {
-        const a = portCells.get(`${e.from.nodeId}/${e.from.portId}`);
-        const b = portCells.get(`${e.to.nodeId}/${e.to.portId}`);
+        const a = portCells.get(portKey(e.from.nodeId, e.from.portId));
+        const b = portCells.get(portKey(e.to.nodeId, e.to.portId));
         if (!a || !b) continue; // 検証済みのドキュメントでは起きない。壊れた参照は描かない
         const fromPort = findPortByRef(this.store.doc, e.from);
         const toPort = findPortByRef(this.store.doc, e.to);
         const fromSide = this.findSide(e.from);
         const toSide = this.findSide(e.to);
-        const lineSig = signals.get(colorPlan.lineSignal.get(e.id) ?? fromPort?.signalType ?? '');
-        const color = signalColor(th, lineSig?.color ?? '#666666');
+        const line = edgeLook(look, e.id, fromPort);
         const edge = g.insertEdge({
           parent,
           id: `e:${e.id}`,
           source: a,
           target: b,
           style: {
-            strokeColor: color,
+            strokeColor: line.color,
             strokeWidth: th.edgeWidth,
             // 信号の線の種類(実線・破線・点線)。指摘のある接続は、次の issueStyle が上書きする
-            ...dashStyle(lineSig),
+            ...dashStyle(line.signal),
             // 指摘のある接続は線種で示す。保存せず、描くたびに判定する(直せば実線に戻る)
             // 方向の不一致は破線、信号の不一致は点線(色だけに頼らず、印刷しても見分けられる)
             ...this.issueStyle(fromPort, toPort, doc.signalTypes),
