@@ -12,7 +12,8 @@ const P = 'page-1';
 type Doc = ReturnType<typeof createSampleDocument>;
 
 const options = (doc: Doc, theme = FLAT_THEME) => ({
-  edgePoints: new Map(doc.pages[0].edges.map((e) => [e.id, [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }]] as const)),
+  // 線ごとに経路を変える(経路の取り違えも検出できるように)
+  edgePoints: new Map(doc.pages[0].edges.map((e, i) => [e.id, [{ x: 100 + i, y: 100 }, { x: 200 + i, y: 100 }, { x: 200 + i, y: 200 + i }]] as const)),
   countText: (n: number) => `×${n}台`,
   legendTitle: '凡例',
   theme,
@@ -33,6 +34,8 @@ function richDocument(): Doc {
   // 親(LAN)側の接続と、サブ信号側の接続を混ぜる(線と接続済みポートの色が、サブ信号側にそろう)
   const mute = doc.pages[0].nodes.find((n) => n.id === 'mute')!;
   mute.portGroupsOverride = [{ id: 'lan', signalType: sub, direction: 'inout', side: 'right', count: 1, labelPrefix: 'LAN ' }];
+  // 1つのポートへ、系統の違う線が集まる接続(接続済みでも、ポート自身の色を保つ仕様の確認)
+  doc.pages[0].edges.push({ id: 'e-conflict', from: { nodeId: 'ap', portId: 'audio-1' }, to: { nodeId: 'ptz', portId: 'lan-1' } });
   return doc;
 }
 
